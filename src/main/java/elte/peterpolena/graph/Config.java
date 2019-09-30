@@ -20,10 +20,10 @@ public class Config {
     public static final int centerY = (int) Math.round(graphPanelHeight * 0.5);
     public static final double graphRadius = (int) Math.round(graphPanelHeight * 0.33);
     public static final int vertexRadius = (int) Math.round(graphRadius * 0.1);
-    public static final int sliderMinValue = 1;
+    public static final int sliderMinValue = 0;
     public static final int sliderMaxValue = 10;
-    public static final int centersSliderStartValue = 1;
-    public static final int clientsSliderStartValue = 1;
+    public static final int centersSliderStartValue = 0;
+    public static final int clientsSliderStartValue = 0;
     public static final int minWeight = 1;
     public static final int maxWeight = 10;
 }
