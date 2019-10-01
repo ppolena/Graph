@@ -1,24 +1,19 @@
 package elte.peterpolena.graph;
 
 import org.jgrapht.Graph;
-import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.graph.DefaultUndirectedWeightedGraph;
 import org.jgrapht.graph.DefaultWeightedEdge;
-import org.jgrapht.graph.SimpleWeightedGraph;
 
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static elte.peterpolena.graph.Config.centersSliderStartValue;
 import static elte.peterpolena.graph.Config.clientsSliderStartValue;
 import static elte.peterpolena.graph.Config.frameHeight;
 import static elte.peterpolena.graph.Config.frameWidth;
+import static elte.peterpolena.graph.Config.maxCenters;
+import static elte.peterpolena.graph.Config.maxClientsPerCenter;
 import static elte.peterpolena.graph.Config.sliderMaxValue;
 import static elte.peterpolena.graph.Config.sliderMinValue;
 import static elte.peterpolena.graph.Config.sliderPanelHeight;
@@ -32,8 +27,13 @@ public class Window {
     private GraphPainter graphPainter;
     private boolean randomizedPlacement = false;
     private boolean showEdgeWeight = true;
+    private int maxCentersValue;
+    private int maxClientsPerCentersValue;
 
     public Window(){
+
+        AlgorithmService algorithmService = new AlgorithmService();
+
         this.frame = new JFrame("Graph");
         this.frame.setSize(frameWidth, frameHeight);
         this.frame.setLocationRelativeTo(null);
@@ -41,6 +41,9 @@ public class Window {
 
         this.graph = new DefaultUndirectedWeightedGraph<>(DefaultWeightedEdge.class);
         this.graphPainter = new GraphPainter(graph, showEdgeWeight);
+
+        this.maxCentersValue = 1;
+        this.maxClientsPerCentersValue = 1;
 
         GraphGenerator graphGenerator = new GraphGenerator();
 
@@ -77,8 +80,18 @@ public class Window {
         JButton reloadButton = new JButton("Reload");
         reloadButton.addActionListener(e -> drawGraph(graphGenerator.generate(centerSlider.getValue(), nodesSlider.getValue(), randomizedPlacement)));
 
+        JSpinner maxCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
+        ((JSpinner.DefaultEditor) maxCentersSpinner.getEditor()).getTextField().setEditable(false);
+        maxCentersSpinner.addChangeListener(e -> this.maxCentersValue = (int) maxCentersSpinner.getValue());
+        JLabel maxCentersLabel = new JLabel("Centers");
+
+        JSpinner maxClientsPerCenterSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxClientsPerCenter, 1));
+        ((JSpinner.DefaultEditor) maxClientsPerCenterSpinner.getEditor()).getTextField().setEditable(false);
+        maxClientsPerCenterSpinner.addChangeListener(e -> this.maxClientsPerCentersValue = (int) maxClientsPerCenterSpinner.getValue());
+        JLabel maxClientsPerCenterLabel = new JLabel("Max Clients Per Centers");
+
         JButton executeMainAlgorithmButton = new JButton("Execute Main Algorithm");
-        executeMainAlgorithmButton.addActionListener(e -> mainAlgorithm());
+        executeMainAlgorithmButton.addActionListener(e -> algorithmService.mainAlgorithm(this.graph, this.maxCentersValue, this.maxClientsPerCentersValue));
 
         ChangeListener optionsChangeListener = e -> {
             JSlider slider = (JSlider) e.getSource();
@@ -99,6 +112,10 @@ public class Window {
         optionsPanel.add(randomizedPlacementCheckBox);
         optionsPanel.add(showEdgeWeightCheckbox);
         optionsPanel.add(reloadButton);
+        optionsPanel.add(maxCentersLabel);
+        optionsPanel.add(maxCentersSpinner);
+        optionsPanel.add(maxClientsPerCenterLabel);
+        optionsPanel.add(maxClientsPerCenterSpinner);
         optionsPanel.add(executeMainAlgorithmButton);
 
         this.frame.add(optionsPanel, BorderLayout.SOUTH);
@@ -108,7 +125,7 @@ public class Window {
         this.frame.setVisible(true);
     }
 
-    public void drawGraph(Graph<Vertex, DefaultWeightedEdge> graph) {
+    private void drawGraph(Graph<Vertex, DefaultWeightedEdge> graph) {
         this.frame.remove(graphPainter);
         this.frame.validate();
         this.frame.repaint();
@@ -119,53 +136,5 @@ public class Window {
         this.frame.add(graphPainter, BorderLayout.CENTER);
         this.frame.validate();
         this.frame.repaint();
-    }
-
-    private boolean mainAlgorithm() {
-        List<DefaultWeightedEdge> edges = new ArrayList<>(this.graph.edgeSet());
-        Comparator<DefaultWeightedEdge> byWeight = getDefaultWeightedEdgeComparator();
-        edges.sort(byWeight);
-
-        List<Graph<Vertex, DefaultWeightedEdge>> subGraphs = new ArrayList<>();
-        edges.forEach(edge -> {
-            double maxWeight = this.graph.getEdgeWeight(edge);
-            Graph<Vertex, DefaultWeightedEdge> subGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-            this.graph.vertexSet().forEach(subGraph::addVertex);
-            this.graph.edgeSet()
-                    .stream()
-                    .filter(edgeToFilter -> this.graph.getEdgeWeight(edgeToFilter) <= maxWeight)
-                    .collect(Collectors.toList())
-                    .forEach(edgeToAdd -> subGraph
-                            .addEdge(
-                                    this.graph.getEdgeSource(edgeToAdd),
-                                    this.graph.getEdgeTarget(edgeToAdd),
-                                    edgeToAdd));
-            subGraphs.add(subGraph);
-        });
-
-        for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
-            if (assignCentersAlgorithm(subGraph)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private Comparator<DefaultWeightedEdge> getDefaultWeightedEdgeComparator() {
-        return (DefaultWeightedEdge edge1, DefaultWeightedEdge edge2) -> {
-            if (this.graph.getEdgeWeight(edge1) < this.graph.getEdgeWeight(edge2)) {
-                return -1;
-            }
-            if (this.graph.getEdgeWeight(edge1) > this.graph.getEdgeWeight(edge2)) {
-                return 1;
-            }
-            return 0;
-        };
-    }
-
-    private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph) {
-        ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
-        List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
-        return false;
     }
 }
