@@ -52,9 +52,47 @@ public class AlgorithmService {
             return false;
         }
 
-        //TODO: foreach connected component: selectMonarchs(), assignDomains(), reAssign()...
+        Set<Graph<Vertex, DefaultWeightedEdge>> subGraphs =
+                connectedComponents
+                        .stream()
+                        .map(vertices -> getSubGraph(graph, vertices))
+                        .collect(Collectors.toSet());
 
-        return false;
+        subGraphs.forEach(subGraph -> {
+            selectMonarchsAlgorithm(subGraph);
+            assignDomains(subGraph);
+            reAssign(subGraph);
+        });
+
+        return true;
+    }
+
+    private void selectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        //TODO
+    }
+
+    private void assignDomains(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        //TODO
+    }
+
+    private void reAssign(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        //TODO
+    }
+
+    private Graph<Vertex, DefaultWeightedEdge> getSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> vertices) {
+        Graph<Vertex, DefaultWeightedEdge> subgraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        vertices.forEach(subgraph::addVertex);
+        List<Vertex> vertexList = new ArrayList<>(vertices);
+        for (int i = 0; i < vertices.size() - 1; ++i) {
+            for (int j = i + 1; j < vertices.size(); ++j) {
+                Vertex vertex1 = vertexList.get(i);
+                Vertex vertex2 = vertexList.get(j);
+                if (graph.containsEdge(vertex1, vertex2)) {
+                    subgraph.addEdge(vertex1, vertex2, graph.getEdge(vertex1, vertex2));
+                }
+            }
+        }
+        return subgraph;
     }
 
     private void addEdgesUpToMaxWeightToSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Graph<Vertex, DefaultWeightedEdge> subGraph, double maxWeight) {
