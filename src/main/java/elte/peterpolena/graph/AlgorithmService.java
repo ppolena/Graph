@@ -1,6 +1,7 @@
 package elte.peterpolena.graph;
 
 import org.jgrapht.Graph;
+import org.jgrapht.Graphs;
 import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
@@ -140,5 +141,26 @@ public class AlgorithmService {
             requiredCenters += requiredCenterForComponent;
         }
         return requiredCenters;
+    }
+
+    private List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
+        List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
+        List<Vertex> vertices = new ArrayList<>(adjacentVertices);
+        if (distance > 1) {
+            adjacentVertices.forEach(adjacentVertex ->
+                    vertices.addAll(getAdjacentVerticesUpToDistance(graph, adjacentVertex, distance - 1)));
+        }
+        return vertices;
+    }
+
+    private List<Vertex> getAdjacentVerticesAtDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
+        List<Vertex> vertices = new ArrayList<>();
+        List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
+        if (distance == 0) {
+            vertices.addAll(adjacentVertices);
+        } else {
+            adjacentVertices.forEach(vertex -> vertices.addAll(getAdjacentVerticesAtDistance(graph, vertex, distance - 1)));
+        }
+        return vertices;
     }
 }
