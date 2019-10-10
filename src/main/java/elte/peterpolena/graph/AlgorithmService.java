@@ -13,10 +13,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.apache.commons.collections4.CollectionUtils.intersection;
+
 @Service
 public class AlgorithmService {
 
-    public boolean mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph, int maxCenters, int maxClientsPerCenter) {
+    public boolean mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
+                                 int maxCenters,
+                                 int maxClientsPerCenter,
+                                 boolean isConservative) {
         List<DefaultWeightedEdge> edges = new ArrayList<>(graph.edgeSet());
         Comparator<DefaultWeightedEdge> byWeight = getDefaultWeightedEdgeComparator(graph);
         edges.sort(byWeight);
@@ -31,14 +36,17 @@ public class AlgorithmService {
         });
 
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
-            if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter)) {
+            if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, isConservative)) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph, int maxCenters, int maxClientsPerCenter) {
+    private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
+                                           int maxCenters,
+                                           int maxClientsPerCenter,
+                                           boolean isConservative) {
         ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
 
         List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
@@ -59,24 +67,79 @@ public class AlgorithmService {
                         .map(vertices -> getSubGraph(graph, vertices))
                         .collect(Collectors.toSet());
 
-        subGraphs.forEach(subGraph -> {
-            selectMonarchsAlgorithm(subGraph);
-            assignDomains(subGraph);
-            reAssign(subGraph);
-        });
+        if (isConservative) {
+            subGraphs.forEach(this::callConservativeAlgorithms);
+        } else {
+            subGraphs.forEach(this::callNonConservativeAlgorithms);
+        }
 
         return true;
     }
 
-    private void selectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+    private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        nonConservativeSelectMonarchsAlgorithm(subGraph);
+        nonConservativeAssignDomainsAlgorithm(subGraph);
+        nonConservativeReAssignAlgorithm(subGraph);
+    }
+
+    private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        conservativeSelectMonarchsAlgorithm(subGraph);
+        conservativeAssignDomainsAlgorithm(subGraph);
+        conservativeReAssignAlgorithm(subGraph);
+    }
+
+    private void nonConservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        List<Vertex> unmarkedNodes = new ArrayList<>();
+        List<Vertex> m1 = new ArrayList<>();
+        List<Vertex> vertices = new ArrayList<>(subGraph.vertexSet());
+        unmarkedNodes.add(vertices.stream().findAny().get());
+        while (!unmarkedNodes.isEmpty()) {
+            Vertex vertex = unmarkedNodes.stream().findAny().get();
+            unmarkedNodes.remove(vertex);
+            vertex.setMonarch();
+            vertex.setMarked();
+            m1.add(vertex);
+            //vertex.setParent(Parent(v))???
+            getAdjacentVerticesUpToDistance(subGraph, vertex, 2).forEach(adjacentVertex -> {
+                if (!adjacentVertex.isMarked()) {
+                    adjacentVertex.setMarked();
+                    vertex.addToEmpire(adjacentVertex);
+                }
+            });
+            intersection(vertex.getEmpire(), getAdjacentVerticesAtDistance(subGraph, vertex, 2))
+                    .forEach(u ->
+                            getAdjacentVerticesAtDistance(subGraph, vertex, 1).forEach(w -> {
+                                if (!w.isMarked() && !unmarkedNodes.contains(w)) {
+                                    w.setParent(vertex);
+                                    w.setDeputy(u);
+                                    unmarkedNodes.add(w);
+                                }
+                            }));
+        }
+        //TODO: finish
+    }
+
+    private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
         //TODO
     }
 
-    private void assignDomains(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+    private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
         //TODO
     }
 
-    private void reAssign(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+    private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        //TODO
+    }
+
+    private void conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        //TODO
+    }
+
+    private void conservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+        //TODO
+    }
+
+    private void conservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
         //TODO
     }
 
