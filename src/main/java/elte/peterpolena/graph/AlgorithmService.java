@@ -7,10 +7,9 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.awt.*;
+import java.util.*;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections4.CollectionUtils.intersection;
@@ -21,6 +20,7 @@ public class AlgorithmService {
     public boolean mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
                                  int maxCenters,
                                  int maxClientsPerCenter,
+                                 int maxFailedCenters,
                                  boolean isConservative) {
         List<DefaultWeightedEdge> edges = new ArrayList<>(graph.edgeSet());
         Comparator<DefaultWeightedEdge> byWeight = getDefaultWeightedEdgeComparator(graph);
@@ -36,7 +36,7 @@ public class AlgorithmService {
         });
 
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
-            if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, isConservative)) {
+            if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
                 return true;
             }
         }
@@ -46,6 +46,7 @@ public class AlgorithmService {
     private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
                                            int maxCenters,
                                            int maxClientsPerCenter,
+                                           int maxFailedCenters,
                                            boolean isConservative) {
         ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
 
@@ -61,6 +62,10 @@ public class AlgorithmService {
             return false;
         }
 
+        m1 = new HashSet<>();
+        m2 = new HashSet<>();
+        m = new HashSet<>();
+
         Set<Graph<Vertex, DefaultWeightedEdge>> subGraphs =
                 connectedComponents
                         .stream()
@@ -68,29 +73,34 @@ public class AlgorithmService {
                         .collect(Collectors.toSet());
 
         if (isConservative) {
-            subGraphs.forEach(this::callConservativeAlgorithms);
+            subGraphs.forEach(x -> callConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
         } else {
-            subGraphs.forEach(this::callNonConservativeAlgorithms);
+            subGraphs.forEach(x -> callNonConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
         }
 
         return true;
     }
 
-    private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        nonConservativeSelectMonarchsAlgorithm(subGraph);
+    private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
+                                               int maxCenters,
+                                               int maxClientsPerCenter,
+                                               int maxFailedCenters) {
+        nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         nonConservativeAssignDomainsAlgorithm(subGraph);
-        nonConservativeReAssignAlgorithm(subGraph);
+        nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
     }
 
-    private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+    private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
+                                            int maxCenters,
+                                            int maxClientsPerCenter,
+                                            int maxFailedCenters) {
         conservativeSelectMonarchsAlgorithm(subGraph);
         conservativeAssignDomainsAlgorithm(subGraph);
         conservativeReAssignAlgorithm(subGraph);
     }
 
-    private void nonConservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+    private void nonConservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
         List<Vertex> unmarkedNodes = new ArrayList<>();
-        List<Vertex> m1 = new ArrayList<>();
         List<Vertex> vertices = new ArrayList<>(subGraph.vertexSet());
         unmarkedNodes.add(vertices.stream().findAny().get());
         while (!unmarkedNodes.isEmpty()) {
@@ -116,15 +126,71 @@ public class AlgorithmService {
                                 }
                             }));
         }
-        //TODO: finish
+        for(Vertex m : m1) {
+            List<Vertex> N1 = getAdjacentVerticesAtDistance(subGraph, m, 1);
+            N1.remove(m.getDeputy());
+            m.addAllToMinors(getRandomNVertex(N1, maxFailedCenters - 1));
+            m2.addAll(m.getMinors());
+            for(Vertex v : m.getMinors())
+                v.addToMajors(m);
+            m.addToMajors(m);
+        }
+        // M = M1 UNION M2
+        m.addAll(m1);
+        m.addAll(m2);
     }
 
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        //TODO
+        DefaultWeightedEdge e;
+        Graph<Vertex, DefaultWeightedEdge> G2 = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        //construct bipartite graph
+        for(Vertex v : subGraph.vertexSet())
+            G2.addVertex(v);
+        for(Vertex m : m)
+            G2.addVertex(new Vertex(m.getX(), m.getY(), Color.WHITE)); //we need every element of M twice in this graph
+        //white vertexes = elements at M side
+
+        //edges
+        for(Vertex m : m) {
+            for(Vertex v : getAdjacentVerticesUpToDistance(subGraph, m, 2))
+                G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v); //TODO capacities 1, cost 1, or 0 if m==v
+        }
+        Vertex s = new Vertex(-1000, -1000, Color.BLUE);
+        Vertex t = new Vertex(1000, 1000, Color.BLUE);;
+        G2.addVertex(s);
+        G2.addVertex(t);
+        for(Vertex m : m)
+            G2.addEdge(s, new Vertex(m.getX(), m.getY(), Color.WHITE)); //TODO capacities L
+        for(Vertex v : subGraph.vertexSet())
+            G2.addEdge(v, t); //TODO capacities 1
+
+        //TODO compute a min-cost maximum integral flow on G2
+        for(Vertex v : m) {
+            //TODO set dom(m) = {v | v receives one unit of flow from m in G2}
+        }
     }
 
-    private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        //TODO
+    private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
+        Map<Vertex, Set<Vertex>> unassigned = new HashMap<>();
+        Map<Vertex, Set<Vertex>> passed = new HashMap<>();
+        for(Vertex m : m1) {
+            Set<Vertex> temp = new HashSet<>();
+            temp.add(m);
+            temp.addAll(m.getEmpire());
+            temp.removeAll(m.getDoms());
+            unassigned.put(m, temp);
+        }
+
+        //TODO set passed empty for each node m in T
+
+        while(true) { //TODO while(T is not empty
+            Vertex m = new Vertex(0, 0, Color.WHITE); //TODO remove a leaf node from T
+            int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
+            int k = unassignedAndPassed / maxClientsPerCenter;
+            int e = unassignedAndPassed % maxClientsPerCenter;
+            //getRandomNVertex(m.getEmpire(), k).forEach(x -> x.set..); //allocate k new centers at free nodes in m's empire
+            //TODO assign K*maxClientsPerCenter nodes to them
+        }
     }
 
     private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
@@ -226,4 +292,14 @@ public class AlgorithmService {
         }
         return vertices;
     }
+    private Collection<Vertex> getRandomNVertex(Collection<Vertex> vertices, int num) {
+        List<Vertex> list = new ArrayList<Vertex>(vertices);
+        Collections.shuffle(list);
+        return list.subList(0, num);
+    }
+
+
+    private Set<Vertex> m1;
+    private Set<Vertex> m2;
+    private Set<Vertex> m;
 }
