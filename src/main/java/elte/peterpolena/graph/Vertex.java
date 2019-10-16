@@ -14,9 +14,10 @@ public class Vertex {
     private List<Vertex> empire;
     private Vertex parent;
     private List<Vertex> children;
-    private List<Vertex> majors;
+    private Vertex major;
     private List<Vertex> minors;
-    private List<Vertex> dom;
+    private List<Vertex> clients;
+    private Vertex center;
     private boolean isMarked;
     private boolean isMonarch;
     private Vertex deputy;
@@ -27,9 +28,8 @@ public class Vertex {
         this.color = color;
         this.empire = new ArrayList<>();
         this.children = new ArrayList<>();
-        this.majors = new ArrayList<>();
         this.minors = new ArrayList<>();
-        this.dom = new ArrayList<>();
+        this.clients = new ArrayList<>();
         this.isMarked = false;
         this.isMonarch = false;
     }
@@ -102,25 +102,41 @@ public class Vertex {
         this.deputy = deputy;
     }
 
-    public List<Vertex> getMajors() {
-        return majors;
+    public Vertex getMajor() {
+        return major;
     }
 
-    public void addToMajors(Vertex vertex) { this.majors.add(vertex); }
+    public void setMajor(Vertex major) {
+        this.major = major;
+    }
 
     public List<Vertex> getMinors() {
         return minors;
     }
 
-    public void addToMinors(Vertex vertex) { this.minors.add(vertex); }
-
-    public void addAllToMinors(Collection<Vertex> vertices) { this.minors.addAll(vertices); }
-
-    public List<Vertex> getDoms() {
-        return dom;
+    public void addMinor(Vertex vertex) {
+        this.minors.add(vertex);
     }
 
-    public void addToDoms(Vertex vertex) { this.dom.add(vertex); }
+    public void addMinors(Collection<Vertex> vertices) {
+        this.minors.addAll(vertices);
+    }
+
+    public List<Vertex> getClients() {
+        return clients;
+    }
+
+    public void addClient(Vertex vertex) {
+        this.clients.add(vertex);
+    }
+
+    public Vertex getCenter() {
+        return center;
+    }
+
+    public void setCenter(Vertex center) {
+        this.center = center;
+    }
 
     @Override
     public String toString() {

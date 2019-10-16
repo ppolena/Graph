@@ -91,7 +91,7 @@ public class Window {
         JLabel maxClientsPerCenterLabel = new JLabel("Max Clients Per Centers");
 
         JButton executeMainAlgorithmButton = new JButton("Execute Main Algorithm");
-        executeMainAlgorithmButton.addActionListener(e -> algorithmService.mainAlgorithm(this.graph, this.maxCentersValue, this.maxClientsPerCentersValue));
+        executeMainAlgorithmButton.addActionListener(e -> algorithmService.mainAlgorithm(this.graph, this.maxCentersValue, this.maxClientsPerCentersValue, 2, false));
 
         ChangeListener optionsChangeListener = e -> {
             JSlider slider = (JSlider) e.getSource();

@@ -8,14 +8,29 @@ import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
 import java.awt.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import static elte.peterpolena.graph.Config.maxXCoordinate;
+import static elte.peterpolena.graph.Config.maxYCoordinate;
+import static elte.peterpolena.graph.Config.minXCoordinate;
+import static elte.peterpolena.graph.Config.minYCoordinate;
+import static java.awt.Color.BLUE;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
 
 @Service
 public class AlgorithmService {
+
+    private Set<Vertex> m1 = new HashSet<>();
+    private Set<Vertex> m2 = new HashSet<>();
+    private Set<Vertex> m = new HashSet<>();
 
     public boolean mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
                                  int maxCenters,
@@ -62,10 +77,6 @@ public class AlgorithmService {
             return false;
         }
 
-        m1 = new HashSet<>();
-        m2 = new HashSet<>();
-        m = new HashSet<>();
-
         Set<Graph<Vertex, DefaultWeightedEdge>> subGraphs =
                 connectedComponents
                         .stream()
@@ -88,6 +99,7 @@ public class AlgorithmService {
         nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         nonConservativeAssignDomainsAlgorithm(subGraph);
         nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
+        nonConservativeReAssignByFailedAlgorithm(subGraph);
     }
 
     private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
@@ -126,48 +138,84 @@ public class AlgorithmService {
                                 }
                             }));
         }
-        for(Vertex m : m1) {
-            List<Vertex> N1 = getAdjacentVerticesAtDistance(subGraph, m, 1);
-            N1.remove(m.getDeputy());
-            m.addAllToMinors(getRandomNVertex(N1, maxFailedCenters - 1));
-            m2.addAll(m.getMinors());
-            for(Vertex v : m.getMinors())
-                v.addToMajors(m);
-            m.addToMajors(m);
-        }
+
+        m1.forEach(major -> {
+            List<Vertex> minors = shuffleAndReduceToSize(
+                    getAdjacentVerticesAtDistance(subGraph, major, 1)
+                            .stream()
+                            .filter(vertex -> !vertex.equals(major.getDeputy()))
+                            .collect(Collectors.toList()),
+                    maxFailedCenters - 1);
+
+            major.addMinors(minors);
+            m2.addAll(minors);
+            minors.forEach(minor -> minor.setMajor(major));
+            major.setMajor(major);
+        });
+
         // M = M1 UNION M2
         m.addAll(m1);
         m.addAll(m2);
     }
 
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        DefaultWeightedEdge e;
-        Graph<Vertex, DefaultWeightedEdge> G2 = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-        //construct bipartite graph
-        for(Vertex v : subGraph.vertexSet())
-            G2.addVertex(v);
-        for(Vertex m : m)
-            G2.addVertex(new Vertex(m.getX(), m.getY(), Color.WHITE)); //we need every element of M twice in this graph
-        //white vertexes = elements at M side
 
-        //edges
-        for(Vertex m : m) {
-            for(Vertex v : getAdjacentVerticesUpToDistance(subGraph, m, 2))
-                G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v); //TODO capacities 1, cost 1, or 0 if m==v
-        }
-        Vertex s = new Vertex(-1000, -1000, Color.BLUE);
-        Vertex t = new Vertex(1000, 1000, Color.BLUE);;
-        G2.addVertex(s);
-        G2.addVertex(t);
-        for(Vertex m : m)
-            G2.addEdge(s, new Vertex(m.getX(), m.getY(), Color.WHITE)); //TODO capacities L
-        for(Vertex v : subGraph.vertexSet())
-            G2.addEdge(v, t); //TODO capacities 1
+        //Refactor
+        //The default color of generated nodes is BLACK, the color of centers should be RED, white is not very well visible.
 
-        //TODO compute a min-cost maximum integral flow on G2
-        for(Vertex v : m) {
-            //TODO set dom(m) = {v | v receives one unit of flow from m in G2}
-        }
+        //Construct bipartite graph
+        //Must review whether this really is enough to construct a bipartite graph from m and subGraph.vertexSet()
+        Graph<Vertex, DefaultWeightedEdge> bipartiteGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
+        m.forEach(monarch -> bipartiteGraph.addVertex(new Vertex(monarch.getX(), monarch.getY(), Color.RED)));
+        m.forEach(monarch -> getAdjacentVerticesUpToDistance(subGraph, monarch.getMajor(), 2)
+                .forEach(adjacentVertex -> {
+                    // G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v);
+                    // I think this was incorrect, as it should be (m,v) not (v,v), but correct me if I am wrong
+                    bipartiteGraph.addEdge(monarch, adjacentVertex);
+                    // Set edge weight to 0 if m = v
+                    if (monarch.equals(adjacentVertex)) {
+                        bipartiteGraph.setEdgeWeight(monarch, adjacentVertex, 0);
+                    }
+                }));
+
+//        Graph<Vertex, DefaultWeightedEdge> G2 = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+//        //construct bipartite graph
+//        for(Vertex v : subGraph.vertexSet())
+//            G2.addVertex(v);
+//        for(Vertex m : m)
+//            G2.addVertex(new Vertex(m.getX(), m.getY(), Color.WHITE)); //we need every element of M twice in this graph
+//        //white vertexes = elements at M side
+//
+//        //edges
+//        for(Vertex m : m) {
+//            for(Vertex v : getAdjacentVerticesUpToDistance(subGraph, m, 2))
+//                G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v); //TODO capacities 1, cost 1, or 0 if m==v
+//        }
+
+
+        Vertex s = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
+        Vertex t = new Vertex(maxXCoordinate - 10, maxYCoordinate - 10, BLUE);
+//        Vertex s = new Vertex(-1000, -1000, Color.BLUE);
+//        Vertex t = new Vertex(1000, 1000, Color.BLUE);
+
+        bipartiteGraph.addVertex(s);
+        bipartiteGraph.addVertex(t);
+        m.forEach(monarch -> bipartiteGraph.addEdge(s, new Vertex(monarch.getX(), monarch.getY(), Color.RED)));
+        subGraph.vertexSet().forEach(vertex -> bipartiteGraph.addEdge(t, vertex));
+//        G2.addVertex(s);
+//        G2.addVertex(t);
+//        for(Vertex m : m)
+//            G2.addEdge(s, new Vertex(m.getX(), m.getY(), Color.WHITE)); //TODO capacities L
+//        for(Vertex v : subGraph.vertexSet())
+//            G2.addEdge(v, t); //TODO capacities 1
+//
+//        //TODO compute a min-cost maximum integral flow on G2
+//        for(Vertex v : m) {
+//            //TODO set dom(m) = {v | v receives one unit of flow from m in G2}
+//        }
+
+        //Capacity is the number of clients a center can serve, I don't think this is a property that an edge should have...
     }
 
     private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
@@ -177,7 +225,7 @@ public class AlgorithmService {
             Set<Vertex> temp = new HashSet<>();
             temp.add(m);
             temp.addAll(m.getEmpire());
-            temp.removeAll(m.getDoms());
+            temp.removeAll(m.getClients());
             unassigned.put(m, temp);
         }
 
@@ -188,7 +236,7 @@ public class AlgorithmService {
             int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
             int k = unassignedAndPassed / maxClientsPerCenter;
             int e = unassignedAndPassed % maxClientsPerCenter;
-            //getRandomNVertex(m.getEmpire(), k).forEach(x -> x.set..); //allocate k new centers at free nodes in m's empire
+            //shuffleAndReduceToSize(m.getEmpire(), k).forEach(x -> x.set..); //allocate k new centers at free nodes in m's empire
             //TODO assign K*maxClientsPerCenter nodes to them
         }
     }
@@ -210,19 +258,19 @@ public class AlgorithmService {
     }
 
     private Graph<Vertex, DefaultWeightedEdge> getSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> vertices) {
-        Graph<Vertex, DefaultWeightedEdge> subgraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-        vertices.forEach(subgraph::addVertex);
+        Graph<Vertex, DefaultWeightedEdge> subGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        vertices.forEach(subGraph::addVertex);
         List<Vertex> vertexList = new ArrayList<>(vertices);
         for (int i = 0; i < vertices.size() - 1; ++i) {
             for (int j = i + 1; j < vertices.size(); ++j) {
                 Vertex vertex1 = vertexList.get(i);
                 Vertex vertex2 = vertexList.get(j);
                 if (graph.containsEdge(vertex1, vertex2)) {
-                    subgraph.addEdge(vertex1, vertex2, graph.getEdge(vertex1, vertex2));
+                    subGraph.addEdge(vertex1, vertex2, graph.getEdge(vertex1, vertex2));
                 }
             }
         }
-        return subgraph;
+        return subGraph;
     }
 
     private void addEdgesUpToMaxWeightToSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Graph<Vertex, DefaultWeightedEdge> subGraph, double maxWeight) {
@@ -274,32 +322,33 @@ public class AlgorithmService {
 
     private List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
         List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
-        List<Vertex> vertices = new ArrayList<>(adjacentVertices);
+        Set<Vertex> vertices = new HashSet<>(adjacentVertices);
         if (distance > 1) {
             adjacentVertices.forEach(adjacentVertex ->
                     vertices.addAll(getAdjacentVerticesUpToDistance(graph, adjacentVertex, distance - 1)));
         }
-        return vertices;
+        return new ArrayList<>(vertices);
     }
 
     private List<Vertex> getAdjacentVerticesAtDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
-        List<Vertex> vertices = new ArrayList<>();
         List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
+        Set<Vertex> vertices = new HashSet<>();
         if (distance == 0) {
             vertices.addAll(adjacentVertices);
         } else {
             adjacentVertices.forEach(vertex -> vertices.addAll(getAdjacentVerticesAtDistance(graph, vertex, distance - 1)));
         }
-        return vertices;
+        return new ArrayList<>(vertices);
     }
-    private Collection<Vertex> getRandomNVertex(Collection<Vertex> vertices, int num) {
-        List<Vertex> list = new ArrayList<Vertex>(vertices);
+
+    private List<Vertex> shuffleAndReduceToSize(List<Vertex> vertices, int size) {
+        List<Vertex> list = new ArrayList<>(vertices);
         Collections.shuffle(list);
-        return list.subList(0, num);
+        if (size > list.size()) {
+            return list;
+        } else if (size < 0) {
+            return new ArrayList<>();
+        }
+        return list.subList(0, size);
     }
-
-
-    private Set<Vertex> m1;
-    private Set<Vertex> m2;
-    private Set<Vertex> m;
 }
