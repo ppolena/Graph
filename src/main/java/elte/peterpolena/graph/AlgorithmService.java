@@ -123,9 +123,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                             int maxCenters,
                                             int maxClientsPerCenter,
                                             int maxFailedCenters) {
-        conservativeSelectMonarchsAlgorithm(subGraph);
+        conservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         conservativeAssignDomainsAlgorithm(subGraph);
-        conservativeReAssignAlgorithm(subGraph);
+        conservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
     }
 
     private void nonConservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
@@ -147,7 +147,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             });
             intersection(vertex.getEmpire(), getAdjacentVerticesAtDistance(subGraph, vertex, 2))
                     .forEach(u ->
-                            getAdjacentVerticesAtDistance(subGraph, vertex, 1).forEach(w -> {
+                            getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(w -> {
                                 if (!w.isMarked() && !unmarkedNodes.contains(w)) {
                                     w.setParent(vertex);
                                     w.setDeputy(u);
@@ -259,12 +259,12 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
         Map<Vertex, Set<Vertex>> unassigned = new HashMap<>();
         Map<Vertex, Set<Vertex>> passed = new HashMap<>();
-        for(Vertex m : m1) {
+        for(Vertex monarch : m1) {
             Set<Vertex> temp = new HashSet<>();
-            temp.add(m);
-            temp.addAll(m.getEmpire());
-            temp.removeAll(m.getClients());
-            unassigned.put(m, temp);
+            temp.add(monarch);
+            temp.addAll(monarch.getEmpire());
+            m.forEach(v -> temp.removeAll(v.getClients()));
+            unassigned.put(monarch, temp);
         }
 
         //TODO set passed empty for each node m in T
@@ -283,16 +283,118 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         //TODO
     }
 
-    private void conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        //TODO
+    private void conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
+        List<Vertex> unmarkedNodes = new ArrayList<>();
+        List<Vertex> vertices = new ArrayList<>(subGraph.vertexSet());
+        unmarkedNodes.add(vertices.stream().findAny().get());
+
+        while(hasUnmarkedNodesFurther(subGraph, m1, 10)) {
+            Vertex vertex;
+            if(m1.isEmpty()) {
+                vertex = unmarkedNodes.stream().findAny().get();
+            }
+            else {
+                vertex = getRandomVertexFromDistance(subGraph, m1, unmarkedNodes, 10);
+            }
+            m1.add(vertex); //major monarch
+            vertex.setMonarch();
+            vertex.setMarked();
+            getAdjacentVerticesUpToDistance(subGraph, vertex, 5).forEach(adjacentVertex -> {
+                if(!adjacentVertex.isMarked()) {
+                    vertex.addToEmpire(adjacentVertex);
+                    adjacentVertex.setMarked();
+                }
+            });
+
+            intersection(vertex.getEmpire(), getAdjacentVerticesAtDistance(subGraph, vertex, 5))
+                    .forEach(u ->
+                            getAdjacentVerticesAtDistance(subGraph, vertex, 5).forEach(w -> {
+                                if (!w.isMarked() && !unmarkedNodes.contains(w)) {
+                                    w.setParent(vertex);
+                                    w.setDeputy(u);
+                                    unmarkedNodes.add(w);
+                                }
+                            }));
+
+        }
+        m1.forEach(m -> {
+            shuffleAndReduceToSize(getAdjacentVerticesAtDistance(subGraph, m, 1), maxFailedCenters).forEach(v -> {
+                //TODO make them backup centers
+            });
+        });
+
+        unmarkedNodes.clear();
+        m1.forEach(m -> {
+            intersection(m.getEmpire(), getAdjacentVerticesAtDistance(subGraph, m, 5))
+                .forEach(u -> {
+                    getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(neighbor -> {
+                        if(!neighbor.isMarked() && neighbor.getParent() == null && !unmarkedNodes.contains(neighbor)) {
+                            neighbor.setParent(m);
+                            unmarkedNodes.add(neighbor);
+                            neighbor.setDeputy(u);
+                        }
+                    });
+                });
+        });
+
+        while (!unmarkedNodes.isEmpty()) {
+            Vertex vertex = unmarkedNodes.stream().findAny().get();
+            unmarkedNodes.remove(vertex);
+            vertex.setMonarch(); //minor monarch
+            vertex.setMarked();
+            m2.add(vertex);
+            //vertex.setParent(Parent(v))???
+            getAdjacentVerticesUpToDistance(subGraph, vertex, 5).forEach(adjacentVertex -> {
+                if (!adjacentVertex.isMarked()) {
+                    adjacentVertex.setMarked();
+                    vertex.addToEmpire(adjacentVertex);
+                }
+            });
+            intersection(vertex.getEmpire(), getAdjacentVerticesAtDistance(subGraph, vertex, 5))
+                    .forEach(u ->
+                            getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(neighbor -> {
+                                if(!neighbor.isMarked() && neighbor.getParent() == null && !unmarkedNodes.contains(neighbor)) {
+                                    neighbor.setParent(vertex);
+                                    unmarkedNodes.add(neighbor);
+                                    neighbor.setDeputy(u);
+                                }
+                            }));
+        }
+        m.addAll(m1);
+        m.addAll(m2);
     }
 
     private void conservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        //TODO
+        //TODO almost the same as nonConservative
     }
 
-    private void conservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        //TODO
+    private void conservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
+        Map<Vertex, Set<Vertex>> unassigned = new HashMap<>();
+        Map<Vertex, Set<Vertex>> passed = new HashMap<>();
+        for(Vertex monarch : m) {
+            Set<Vertex> temp = new HashSet<>();
+            temp.add(monarch);
+            temp.addAll(monarch.getEmpire());
+            m.forEach(v -> temp.removeAll(v.getClients()));
+            unassigned.put(monarch, temp);
+        }
+
+        //TODO set passed empty for each node m in T
+
+        while(true) { //TODO while(T is not empty
+            Vertex m = new Vertex(0, 0, Color.WHITE); //TODO remove a leaf node from T
+
+            //for each node u at level-5 of m do:
+                int passedNum = passed.get(m).size();
+                int k = passedNum / maxClientsPerCenter;
+                int e = passedNum % maxClientsPerCenter;
+                //TODO
+
+            int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
+            k = unassignedAndPassed / maxClientsPerCenter;
+            e = unassignedAndPassed % maxClientsPerCenter;
+            //TODO
+        }
     }
 
     private Graph<Vertex, DefaultWeightedEdge> getSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> vertices) {
@@ -415,5 +517,13 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                 .stream()
                 .map(bipartiteGraph::getEdgeTarget)
                 .collect(toSet());
+    }
+
+    private boolean hasUnmarkedNodesFurther(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> fromSet, int distance) {
+        return true; //TODO implement
+    }
+
+    private Vertex getRandomVertexFromDistance(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> distanceFrom, List<Vertex> fromList, int distance) {
+        return new Vertex(0, 0, BLUE); //TODO implement
     }
 }
