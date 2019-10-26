@@ -6,6 +6,7 @@ import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.alg.flow.mincost.CapacityScalingMinimumCostFlow;
 import org.jgrapht.alg.flow.mincost.MinimumCostFlowProblem.MinimumCostFlowProblemImpl;
 import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
@@ -193,8 +194,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 //                G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v); //TODO capacities 1, cost 1, or 0 if m==v
 //        }
 
-        //Construct bipartite graph
-        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleWeightedGraph<>(WeightedEdgeWithCapacity.class);
+        //Construct directed bipartite graph
+        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
         subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
         //copy monarch set into bipartite graph
         Set<Vertex> monarchs = new HashSet<>(m);
@@ -233,7 +234,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             bipartiteGraph.getEdge(vertex, target).setCapacity(1);
         });
 
-        //for m ∈ M and v ∈ V set capacity to 1 and if m = v set (m,v) weight to 0
+        //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
         monarchs.forEach(monarch -> subGraph.vertexSet()
                 .forEach(vertex -> {
                     bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
@@ -242,13 +243,13 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                     }
                 }));
 
-        //calculate minimum cost flow
+        //calculate minimum cost maximum flow
         Map<WeightedEdgeWithCapacity, Double> flowMap = new CapacityScalingMinimumCostFlow<Vertex, WeightedEdgeWithCapacity>()
                 .getMinimumCostFlow(new MinimumCostFlowProblemImpl<>(
                         bipartiteGraph,
                         vertex -> getVertexSupply(source, target, vertex),
-                        edge -> getEdgeCapacity(bipartiteGraph, edge),
-                        edge -> getEdgeCapacity(bipartiteGraph, edge)))
+                        edge -> getEdgeCapacity(bipartiteGraph, edge), //max directed edge capacity
+                        edge -> getEdgeCapacity(bipartiteGraph, edge))) //min directed edge capacity
                 .getFlowMap();
 
         //for m ∈ M add v to dom(m) if v receives one unit of flow from m
