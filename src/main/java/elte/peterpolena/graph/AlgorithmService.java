@@ -3,6 +3,8 @@ package elte.peterpolena.graph;
 import org.jgrapht.Graph;
 import org.jgrapht.Graphs;
 import org.jgrapht.alg.connectivity.ConnectivityInspector;
+import org.jgrapht.alg.flow.mincost.CapacityScalingMinimumCostFlow;
+import org.jgrapht.alg.flow.mincost.MinimumCostFlowProblem.MinimumCostFlowProblemImpl;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
@@ -16,17 +18,31 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static elte.peterpolena.graph.Config.maxXCoordinate;
 import static elte.peterpolena.graph.Config.maxYCoordinate;
 import static elte.peterpolena.graph.Config.minXCoordinate;
 import static elte.peterpolena.graph.Config.minYCoordinate;
 import static java.awt.Color.BLUE;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
 
 @Service
 public class AlgorithmService {
+
+/*
+maxCenters = K
+requiredCenters = Kw
+maxClientsPerCenter = L
+unmarkedNodes = Q
+maxFailedCenters = α
+source = s
+target = t
+getAdjacentVerticesUpToDistance(Gw, v, i) = Γi(v)
+getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
+ */
+
 
     private Set<Vertex> m1 = new HashSet<>();
     private Set<Vertex> m2 = new HashSet<>();
@@ -81,7 +97,7 @@ public class AlgorithmService {
                 connectedComponents
                         .stream()
                         .map(vertices -> getSubGraph(graph, vertices))
-                        .collect(Collectors.toSet());
+                        .collect(toSet());
 
         if (isConservative) {
             subGraphs.forEach(x -> callConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
@@ -97,7 +113,7 @@ public class AlgorithmService {
                                                int maxClientsPerCenter,
                                                int maxFailedCenters) {
         nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
-        nonConservativeAssignDomainsAlgorithm(subGraph);
+        nonConservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
         nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
         nonConservativeReAssignByFailedAlgorithm(subGraph);
     }
@@ -144,7 +160,7 @@ public class AlgorithmService {
                     getAdjacentVerticesAtDistance(subGraph, major, 1)
                             .stream()
                             .filter(vertex -> !vertex.equals(major.getDeputy()))
-                            .collect(Collectors.toList()),
+                            .collect(toList()),
                     maxFailedCenters - 1);
 
             major.addMinors(minors);
@@ -158,26 +174,10 @@ public class AlgorithmService {
         m.addAll(m2);
     }
 
-    private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
+    private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
 
-        //Refactor
-        //The default color of generated nodes is BLACK, the color of centers should be RED, white is not very well visible.
-
-        //Construct bipartite graph
-        //Must review whether this really is enough to construct a bipartite graph from m and subGraph.vertexSet()
-        Graph<Vertex, DefaultWeightedEdge> bipartiteGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-        subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
-        m.forEach(monarch -> bipartiteGraph.addVertex(new Vertex(monarch.getX(), monarch.getY(), Color.RED)));
-        m.forEach(monarch -> getAdjacentVerticesUpToDistance(subGraph, monarch.getMajor(), 2)
-                .forEach(adjacentVertex -> {
-                    // G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v);
-                    // I think this was incorrect, as it should be (m,v) not (v,v), but correct me if I am wrong
-                    bipartiteGraph.addEdge(monarch, adjacentVertex);
-                    // Set edge weight to 0 if m = v
-                    if (monarch.equals(adjacentVertex)) {
-                        bipartiteGraph.setEdgeWeight(monarch, adjacentVertex, 0);
-                    }
-                }));
+//        Refactor
+//        The default color of generated nodes is BLACK, the color of centers should be RED, white is not very well visible.
 
 //        Graph<Vertex, DefaultWeightedEdge> G2 = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
 //        //construct bipartite graph
@@ -193,16 +193,16 @@ public class AlgorithmService {
 //                G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v); //TODO capacities 1, cost 1, or 0 if m==v
 //        }
 
+        //Construct bipartite graph
+        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleWeightedGraph<>(WeightedEdgeWithCapacity.class);
+        subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
+        //copy monarch set into bipartite graph
+        Set<Vertex> monarchs = new HashSet<>(m);
+        monarchs.forEach(bipartiteGraph::addVertex);
+        //E'
+        monarchs.forEach(monarch -> getAdjacentVerticesUpToDistance(subGraph, monarch.getMajor(), 2)
+                .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, adjacentVertex)));
 
-        Vertex s = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
-        Vertex t = new Vertex(maxXCoordinate - 10, maxYCoordinate - 10, BLUE);
-//        Vertex s = new Vertex(-1000, -1000, Color.BLUE);
-//        Vertex t = new Vertex(1000, 1000, Color.BLUE);
-
-        bipartiteGraph.addVertex(s);
-        bipartiteGraph.addVertex(t);
-        m.forEach(monarch -> bipartiteGraph.addEdge(s, new Vertex(monarch.getX(), monarch.getY(), Color.RED)));
-        subGraph.vertexSet().forEach(vertex -> bipartiteGraph.addEdge(t, vertex));
 //        G2.addVertex(s);
 //        G2.addVertex(t);
 //        for(Vertex m : m)
@@ -215,7 +215,44 @@ public class AlgorithmService {
 //            //TODO set dom(m) = {v | v receives one unit of flow from m in G2}
 //        }
 
-        //Capacity is the number of clients a center can serve, I don't think this is a property that an edge should have...
+        //add s and t
+        Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
+        Vertex target = new Vertex(maxXCoordinate - 10, maxYCoordinate - 10, BLUE);
+        bipartiteGraph.addVertex(source);
+        bipartiteGraph.addVertex(target);
+
+        //for m ∈ M add edge (s, m) and set (s, m) capacity to L
+        monarchs.forEach(monarch -> {
+            bipartiteGraph.addEdge(source, monarch);
+            bipartiteGraph.getEdge(source, monarch).setCapacity(maxClientsPerCenter);
+        });
+
+        //for v ∈ V add edge (v, t) and set (s, m) capacity to 1
+        subGraph.vertexSet().forEach(vertex -> {
+            bipartiteGraph.addEdge(vertex, target);
+            bipartiteGraph.getEdge(vertex, target).setCapacity(1);
+        });
+
+        //for m ∈ M and v ∈ V set capacity to 1 and if m = v set (m,v) weight to 0
+        monarchs.forEach(monarch -> subGraph.vertexSet()
+                .forEach(vertex -> {
+                    bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
+                    if (monarch.equals(vertex)) {
+                        bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
+                    }
+                }));
+
+        //calculate minimum cost flow
+        Map<WeightedEdgeWithCapacity, Double> flowMap = new CapacityScalingMinimumCostFlow<Vertex, WeightedEdgeWithCapacity>()
+                .getMinimumCostFlow(new MinimumCostFlowProblemImpl<>(
+                        bipartiteGraph,
+                        vertex -> getVertexSupply(source, target, vertex),
+                        edge -> getEdgeCapacity(bipartiteGraph, edge),
+                        edge -> getEdgeCapacity(bipartiteGraph, edge)))
+                .getFlowMap();
+
+        //for m ∈ M add v to dom(m) if v receives one unit of flow from m
+        m.forEach(monarch -> monarch.setClients(getClients(bipartiteGraph, flowMap, monarch)));
     }
 
     private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
@@ -277,7 +314,7 @@ public class AlgorithmService {
         graph.edgeSet()
                 .stream()
                 .filter(edgeToFilter -> graph.getEdgeWeight(edgeToFilter) <= maxWeight)
-                .collect(Collectors.toList())
+                .collect(toList())
                 .forEach(edgeToAdd -> subGraph
                         .addEdge(
                                 graph.getEdgeSource(edgeToAdd),
@@ -301,7 +338,7 @@ public class AlgorithmService {
         return connectedComponents
                 .stream()
                 .map(Set::size)
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private List<Integer> getRequiredCentersPerComponent(int maxClientsPerCenter, List<Integer> componentNodeCount) {
@@ -309,7 +346,7 @@ public class AlgorithmService {
                 .stream()
                 .map(cnc ->
                         (int) Math.ceil((double) cnc / maxClientsPerCenter))
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private int getRequiredCenters(List<Integer> requiredCentersPerComponent) {
@@ -350,5 +387,32 @@ public class AlgorithmService {
             return new ArrayList<>();
         }
         return list.subList(0, size);
+    }
+
+    private int getEdgeCapacity(Graph<Vertex, WeightedEdgeWithCapacity> graph, WeightedEdgeWithCapacity edge) {
+        return graph.getEdge(graph.getEdgeSource(edge), graph.getEdgeTarget(edge)).getCapacity();
+    }
+
+    private int getVertexSupply(Vertex source, Vertex target, Vertex vertex) {
+        if (vertex.equals(source)) {
+            return 1;
+        } else if (vertex.equals(target)) {
+            return -1;
+        } else {
+            return 0;
+        }
+    }
+
+    private Set<Vertex> getClients(Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph, Map<WeightedEdgeWithCapacity, Double> flowMap, Vertex monarch) {
+        return flowMap
+                .keySet()
+                .stream()
+                .filter(edge -> bipartiteGraph
+                        .getEdgeSource(edge)
+                        .equals(monarch) && flowMap.get(edge) != 0)
+                .collect(toSet())
+                .stream()
+                .map(bipartiteGraph::getEdgeTarget)
+                .collect(toSet());
     }
 }

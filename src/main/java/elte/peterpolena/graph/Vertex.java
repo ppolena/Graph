@@ -3,10 +3,18 @@ package elte.peterpolena.graph;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public class Vertex {
+
+/*
+vertex.getEmpire() = Emp(v)
+vertex.getClients() = dom(v)
+vertex.getCenter() = ctr(v)
+ */
 
     private final int x;
     private final int y;
@@ -16,7 +24,7 @@ public class Vertex {
     private List<Vertex> children;
     private Vertex major;
     private List<Vertex> minors;
-    private List<Vertex> clients;
+    private Set<Vertex> clients;
     private Vertex center;
     private boolean isMarked;
     private boolean isMonarch;
@@ -29,7 +37,7 @@ public class Vertex {
         this.empire = new ArrayList<>();
         this.children = new ArrayList<>();
         this.minors = new ArrayList<>();
-        this.clients = new ArrayList<>();
+        this.clients = new HashSet<>();
         this.isMarked = false;
         this.isMonarch = false;
     }
@@ -122,12 +130,16 @@ public class Vertex {
         this.minors.addAll(vertices);
     }
 
-    public List<Vertex> getClients() {
+    public Set<Vertex> getClients() {
         return clients;
     }
 
     public void addClient(Vertex vertex) {
         this.clients.add(vertex);
+    }
+
+    public void setClients(Set<Vertex> clients) {
+        this.clients = clients;
     }
 
     public Vertex getCenter() {
