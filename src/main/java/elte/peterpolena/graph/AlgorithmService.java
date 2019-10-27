@@ -267,15 +267,21 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             unassigned.put(monarch, temp);
         }
 
-        //TODO set passed empty for each node m in T
+        Set<Vertex> monarchTree = new HashSet<>();
+        monarchTree.addAll(m1);
+        monarchTree.forEach(m -> passed.put(m, new HashSet<>()));
 
-        while(true) { //TODO while(T is not empty
-            Vertex m = new Vertex(0, 0, Color.WHITE); //TODO remove a leaf node from T
+        while(!monarchTree.isEmpty()) {
+            Vertex m = getALeaf(monarchTree);
             int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
             int k = unassignedAndPassed / maxClientsPerCenter;
             int e = unassignedAndPassed % maxClientsPerCenter;
             //shuffleAndReduceToSize(m.getEmpire(), k).forEach(x -> x.set..); //allocate k new centers at free nodes in m's empire
             //TODO assign K*maxClientsPerCenter nodes to them
+
+            //TODO assign e remaining nodes to m, releasing e nodes in dom(m)
+            //add the released nodes to passed(parent(m)) unless m is the root - then ...
+            monarchTree.remove(m);
         }
     }
 
@@ -379,10 +385,13 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             unassigned.put(monarch, temp);
         }
 
-        //TODO set passed empty for each node m in T
 
-        while(true) { //TODO while(T is not empty
-            Vertex m = new Vertex(0, 0, Color.WHITE); //TODO remove a leaf node from T
+        Set<Vertex> monarchTree = new HashSet<>();
+        monarchTree.addAll(m);
+        monarchTree.forEach(m -> passed.put(m, new HashSet<>()));
+
+        while(!monarchTree.isEmpty()) {
+            Vertex m = getALeaf(monarchTree); //TODO remove a leaf node from T
 
             //for each node u at level-5 of m do:
                 int passedNum = passed.get(m).size();
@@ -525,5 +534,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
     private Vertex getRandomVertexFromDistance(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> distanceFrom, List<Vertex> fromList, int distance) {
         return new Vertex(0, 0, BLUE); //TODO implement
+    }
+
+    private Vertex getALeaf(Set<Vertex> tree) {
+        return tree.stream().filter(x -> !tree.stream().anyMatch(y -> y.getParent() == x)).findAny().get();
     }
 }
