@@ -10,7 +10,6 @@ import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -259,16 +258,14 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
         Map<Vertex, Set<Vertex>> unassigned = new HashMap<>();
         Map<Vertex, Set<Vertex>> passed = new HashMap<>();
-        for(Vertex monarch : m1) {
-            Set<Vertex> temp = new HashSet<>();
+        m1.forEach(monarch -> {
+            Set<Vertex> temp = new HashSet<>(monarch.getEmpire());
             temp.add(monarch);
-            temp.addAll(monarch.getEmpire());
-            m.forEach(v -> temp.removeAll(v.getClients()));
+            m.forEach(vertex -> temp.removeAll(vertex.getClients()));
             unassigned.put(monarch, temp);
-        }
+        });
 
-        Set<Vertex> monarchTree = new HashSet<>();
-        monarchTree.addAll(m1);
+        Set<Vertex> monarchTree = new HashSet<>(m1);
         monarchTree.forEach(m -> passed.put(m, new HashSet<>()));
 
         while(!monarchTree.isEmpty()) {
@@ -537,6 +534,6 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     }
 
     private Vertex getALeaf(Set<Vertex> tree) {
-        return tree.stream().filter(x -> !tree.stream().anyMatch(y -> y.getParent() == x)).findAny().get();
+        return tree.stream().filter(x -> tree.stream().noneMatch(y -> y.getParent() == x)).findAny().get();
     }
 }
