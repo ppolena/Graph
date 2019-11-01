@@ -318,12 +318,7 @@ free node => node.getColor().equals(BLACK)
         //if |M'| < ceil(n/L) + α
         if (centers < requiredCenters) {
             int centersNeeded = (int) (requiredCenters - centers);
-            List<Vertex> freeNodes = subGraph
-                    .vertexSet()
-                    .stream()
-                    .filter(vertex -> vertex.getColor().equals(BLACK))
-                    .collect(toList());
-
+            List<Vertex> freeNodes = getFreeNodes(new ArrayList<>(subGraph.vertexSet()));
             shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
         }
     }
@@ -583,8 +578,8 @@ free node => node.getColor().equals(BLACK)
         return tree.stream().filter(x -> tree.stream().noneMatch(y -> y.getParent() == x)).findAny().get();
     }
 
-    private List<Vertex> getFreeNodes(List<Vertex> unassignedAndPassedVertices) {
-        return unassignedAndPassedVertices
+    private List<Vertex> getFreeNodes(List<Vertex> vertices) {
+        return vertices
                 .stream()
                 .filter(node -> node.getColor().equals(BLACK))
                 .collect(toList());
