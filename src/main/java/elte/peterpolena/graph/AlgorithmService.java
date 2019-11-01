@@ -296,6 +296,7 @@ free node => node.getColor().equals(BLACK)
                 Vertex center = freeNodes.stream().findAny().get();
                 center.setColor(RED);
                 center.addClients(new HashSet<>(releasedClients));
+                center.getClients().forEach(client -> client.setCenter(center));
             }
 
             monarchTree.remove(m);
