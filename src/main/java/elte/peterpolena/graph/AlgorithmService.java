@@ -261,16 +261,22 @@ free node => node.getColor().equals(BLACK)
             //center => RED
             //client => BLACK
 
-            //select k' centers
+            //select k' centers from m.getEmpire()
             List<Vertex> centers = shuffleAndReduceToSize(m.getEmpire(), k);
             centers.forEach(center -> {
                 center.setColor(RED);
                 //center.setCenter(center); not sure about this
             });
 
-            //select k'L free nodes
-            List<Vertex> freeNodes = getFreeNodes(m);
+            //select k'L free nodes from unassigned(m) + passed(m)
+            List<Vertex> unassignedAndPassedVertices = new ArrayList<>(unassigned.get(m));
+            unassignedAndPassedVertices.addAll(passed.get(m));
+            List<Vertex> freeNodes = getFreeNodes(unassignedAndPassedVertices);
             List<Vertex> nodesToAssignToCenters = shuffleAndReduceToSize(freeNodes, k * maxClientsPerCenter);
+
+            //select e free nodes
+            freeNodes.removeAll(nodesToAssignToCenters);
+            List<Vertex> nodesToAssignToM = shuffleAndReduceToSize(freeNodes, e);
 
             //create L sized sublist from k'L nodes
             List<List<Vertex>> partitionedNodesToAssignToCenters = partition(nodesToAssignToCenters, maxClientsPerCenter);
@@ -283,9 +289,10 @@ free node => node.getColor().equals(BLACK)
                 clientsForCenter.forEach(client -> client.setCenter(center));
             }
 
-            //release e nodes from dom(m)
+            //release e nodes from dom(m) and assign e free nodes to m
             List<Vertex> releasedClients = shuffleAndReduceToSize(new ArrayList<>(m.getClients()), e);
             m.getClients().removeAll(releasedClients);
+            m.addClients(new HashSet<>(nodesToAssignToM));
 
             //add releasedClients to passed(Parent(m)) if m.getParent() != null
             //else
@@ -303,7 +310,7 @@ free node => node.getColor().equals(BLACK)
         }
 
         //M' = all centers allocated so far
-        long centers = m.stream().filter(monarch -> monarch.getColor().equals(RED)).count();
+        long centers = subGraph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
 
         //ceil(n/L) + α
         long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
@@ -311,13 +318,11 @@ free node => node.getColor().equals(BLACK)
         //if |M'| < ceil(n/L) + α
         if (centers < requiredCenters) {
             int centersNeeded = (int) (requiredCenters - centers);
-            List<Vertex> freeNodes = new ArrayList<>();
-            m.stream().map(monarch -> monarch.getEmpire()
+            List<Vertex> freeNodes = subGraph
+                    .vertexSet()
                     .stream()
-                    .filter(node -> node.getColor().equals(BLACK))
-                    .collect(toList()))
-                    .collect(toList())
-                    .forEach(freeNodes::addAll);
+                    .filter(vertex -> vertex.getColor().equals(BLACK))
+                    .collect(toList());
 
             shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
         }
@@ -578,8 +583,8 @@ free node => node.getColor().equals(BLACK)
         return tree.stream().filter(x -> tree.stream().noneMatch(y -> y.getParent() == x)).findAny().get();
     }
 
-    private List<Vertex> getFreeNodes(Vertex m) {
-        return m.getEmpire()
+    private List<Vertex> getFreeNodes(List<Vertex> unassignedAndPassedVertices) {
+        return unassignedAndPassedVertices
                 .stream()
                 .filter(node -> node.getColor().equals(BLACK))
                 .collect(toList());
