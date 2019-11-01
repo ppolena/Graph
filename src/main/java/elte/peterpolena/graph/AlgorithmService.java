@@ -303,14 +303,14 @@ free node => node.getColor().equals(BLACK)
         }
 
         //M' = all centers allocated so far
-        int centers = m.stream().filter(monarch -> monarch.getColor().equals(RED)).collect(toSet()).size();
+        long centers = m.stream().filter(monarch -> monarch.getColor().equals(RED)).count();
 
         //ceil(n/L) + α
-        int requiredCenters = (int) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
+        long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
 
         //if |M'| < ceil(n/L) + α
         if (centers < requiredCenters) {
-            int centersNeeded = requiredCenters - centers;
+            int centersNeeded = (int) (requiredCenters - centers);
             List<Vertex> freeNodes = new ArrayList<>();
             m.stream().map(monarch -> monarch.getEmpire()
                     .stream()
