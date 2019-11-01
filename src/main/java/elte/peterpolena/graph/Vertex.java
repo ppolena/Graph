@@ -122,20 +122,24 @@ vertex.getCenter() = ctr(v)
         return minors;
     }
 
-    public void addMinor(Vertex vertex) {
-        this.minors.add(vertex);
+    public void addMinor(Vertex minor) {
+        this.minors.add(minor);
     }
 
-    public void addMinors(Collection<Vertex> vertices) {
-        this.minors.addAll(vertices);
+    public void addMinors(Collection<Vertex> minors) {
+        this.minors.addAll(minors);
     }
 
     public Set<Vertex> getClients() {
         return clients;
     }
 
-    public void addClient(Vertex vertex) {
-        this.clients.add(vertex);
+    public void addClient(Vertex client) {
+        this.clients.add(client);
+    }
+
+    public void addClients(Set<Vertex> clients) {
+        this.clients.addAll(clients);
     }
 
     public void setClients(Set<Vertex> clients) {

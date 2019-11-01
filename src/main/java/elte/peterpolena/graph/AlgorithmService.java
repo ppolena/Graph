@@ -23,10 +23,13 @@ import static elte.peterpolena.graph.Config.maxXCoordinate;
 import static elte.peterpolena.graph.Config.maxYCoordinate;
 import static elte.peterpolena.graph.Config.minXCoordinate;
 import static elte.peterpolena.graph.Config.minYCoordinate;
+import static java.awt.Color.BLACK;
 import static java.awt.Color.BLUE;
+import static java.awt.Color.RED;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
+import static org.apache.commons.collections4.ListUtils.partition;
 
 @Service
 public class AlgorithmService {
@@ -114,7 +117,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                                int maxFailedCenters) {
         nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         nonConservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
-        nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
+        nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter, maxFailedCenters);
         nonConservativeReAssignByFailedAlgorithm(subGraph);
     }
 
@@ -137,7 +140,6 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             vertex.setMonarch();
             vertex.setMarked();
             m1.add(vertex);
-            //vertex.setParent(Parent(v))???
             getAdjacentVerticesUpToDistance(subGraph, vertex, 2).forEach(adjacentVertex -> {
                 if (!adjacentVertex.isMarked()) {
                     adjacentVertex.setMarked();
@@ -176,23 +178,6 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
 
-//        Refactor
-//        The default color of generated nodes is BLACK, the color of centers should be RED, white is not very well visible.
-
-//        Graph<Vertex, DefaultWeightedEdge> G2 = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-//        //construct bipartite graph
-//        for(Vertex v : subGraph.vertexSet())
-//            G2.addVertex(v);
-//        for(Vertex m : m)
-//            G2.addVertex(new Vertex(m.getX(), m.getY(), Color.WHITE)); //we need every element of M twice in this graph
-//        //white vertexes = elements at M side
-//
-//        //edges
-//        for(Vertex m : m) {
-//            for(Vertex v : getAdjacentVerticesUpToDistance(subGraph, m, 2))
-//                G2.addEdge(new Vertex(v.getX(), v.getY(), Color.WHITE), v); //TODO capacities 1, cost 1, or 0 if m==v
-//        }
-
         //Construct directed bipartite graph
         Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
         subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
@@ -202,18 +187,6 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         //E'
         monarchs.forEach(monarch -> getAdjacentVerticesUpToDistance(subGraph, monarch.getMajor(), 2)
                 .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, adjacentVertex)));
-
-//        G2.addVertex(s);
-//        G2.addVertex(t);
-//        for(Vertex m : m)
-//            G2.addEdge(s, new Vertex(m.getX(), m.getY(), Color.WHITE)); //TODO capacities L
-//        for(Vertex v : subGraph.vertexSet())
-//            G2.addEdge(v, t); //TODO capacities 1
-//
-//        //TODO compute a min-cost maximum integral flow on G2
-//        for(Vertex v : m) {
-//            //TODO set dom(m) = {v | v receives one unit of flow from m in G2}
-//        }
 
         //add s and t
         Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
@@ -252,33 +225,100 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                 .getFlowMap();
 
         //for m ∈ M add v to dom(m) if v receives one unit of flow from m
-        m.forEach(monarch -> monarch.setClients(getClients(bipartiteGraph, flowMap, monarch)));
+        m.forEach(monarch -> {
+            monarch.setClients(getClients(bipartiteGraph, flowMap, monarch));
+            monarch.getClients().forEach(client -> client.setCenter(monarch));
+        });
     }
 
-    private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
+    private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter, int maxFailedCenters) {
+/*
+unassigned(m) => foreach m ∈ m1: foreach v ∈ m.getEmpire(): v.getCenter() == null
+free node => node.getColor().equals(BLACK)
+ */
+
         Map<Vertex, Set<Vertex>> unassigned = new HashMap<>();
         Map<Vertex, Set<Vertex>> passed = new HashMap<>();
-        m1.forEach(monarch -> {
-            Set<Vertex> temp = new HashSet<>(monarch.getEmpire());
-            temp.add(monarch);
-            m.forEach(vertex -> temp.removeAll(vertex.getClients()));
-            unassigned.put(monarch, temp);
-        });
+
+        m1.forEach(major ->
+                unassigned.put(
+                        major,
+                        major.getEmpire()
+                                .stream()
+                                .filter(client -> client.getCenter() == null)
+                                .collect(toSet())));
 
         Set<Vertex> monarchTree = new HashSet<>(m1);
-        monarchTree.forEach(m -> passed.put(m, new HashSet<>()));
+        monarchTree.forEach(major -> passed.put(major, new HashSet<>()));
 
         while(!monarchTree.isEmpty()) {
             Vertex m = getALeaf(monarchTree);
+
             int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
             int k = unassignedAndPassed / maxClientsPerCenter;
             int e = unassignedAndPassed % maxClientsPerCenter;
-            //shuffleAndReduceToSize(m.getEmpire(), k).forEach(x -> x.set..); //allocate k new centers at free nodes in m's empire
-            //TODO assign K*maxClientsPerCenter nodes to them
 
-            //TODO assign e remaining nodes to m, releasing e nodes in dom(m)
-            //add the released nodes to passed(parent(m)) unless m is the root - then ...
+            //center => RED
+            //client => BLACK
+
+            //select k' centers
+            List<Vertex> centers = shuffleAndReduceToSize(m.getEmpire(), k);
+            centers.forEach(center -> {
+                center.setColor(RED);
+                //center.setCenter(center); not sure about this
+            });
+
+            //select k'L free nodes
+            List<Vertex> freeNodes = getFreeNodes(m);
+            List<Vertex> nodesToAssignToCenters = shuffleAndReduceToSize(freeNodes, k * maxClientsPerCenter);
+
+            //create L sized sublist from k'L nodes
+            List<List<Vertex>> partitionedNodesToAssignToCenters = partition(nodesToAssignToCenters, maxClientsPerCenter);
+
+            //assign k'L free nodes to k' centers
+            for (int i = 0; i < partitionedNodesToAssignToCenters.size(); ++i) {
+                Vertex center = centers.get(i);
+                Set<Vertex> clientsForCenter = new HashSet<>(partitionedNodesToAssignToCenters.get(i));
+                center.addClients(clientsForCenter);
+                clientsForCenter.forEach(client -> client.setCenter(center));
+            }
+
+            //release e nodes from dom(m)
+            List<Vertex> releasedClients = shuffleAndReduceToSize(new ArrayList<>(m.getClients()), e);
+            m.getClients().removeAll(releasedClients);
+
+            //add releasedClients to passed(Parent(m)) if m.getParent() != null
+            //else
+            //create a new center from freeNodes and assign releaseClients to it
+            if (m.getParent() != null) {
+                passed.get(m.getParent()).addAll(releasedClients);
+            } else {
+                Vertex center = freeNodes.stream().findAny().get();
+                center.setColor(RED);
+                center.addClients(new HashSet<>(releasedClients));
+            }
+
             monarchTree.remove(m);
+        }
+
+        //M' = all centers allocated so far
+        int centers = m.stream().filter(monarch -> monarch.getColor().equals(RED)).collect(toSet()).size();
+
+        //ceil(n/L) + α
+        int requiredCenters = (int) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
+
+        //if |M'| < ceil(n/L) + α
+        if (centers < requiredCenters) {
+            int centersNeeded = requiredCenters - centers;
+            List<Vertex> freeNodes = new ArrayList<>();
+            m.stream().map(monarch -> monarch.getEmpire()
+                    .stream()
+                    .filter(node -> node.getColor().equals(BLACK))
+                    .collect(toList()))
+                    .collect(toList())
+                    .forEach(freeNodes::addAll);
+
+            shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
         }
     }
 
@@ -535,5 +575,12 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
     private Vertex getALeaf(Set<Vertex> tree) {
         return tree.stream().filter(x -> tree.stream().noneMatch(y -> y.getParent() == x)).findAny().get();
+    }
+
+    private List<Vertex> getFreeNodes(Vertex m) {
+        return m.getEmpire()
+                .stream()
+                .filter(node -> node.getColor().equals(BLACK))
+                .collect(toList());
     }
 }
