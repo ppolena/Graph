@@ -5,6 +5,7 @@ import org.jgrapht.Graphs;
 import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.alg.flow.mincost.CapacityScalingMinimumCostFlow;
 import org.jgrapht.alg.flow.mincost.MinimumCostFlowProblem.MinimumCostFlowProblemImpl;
+import org.jgrapht.alg.util.Pair;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
@@ -142,7 +143,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         nonConservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
         nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter, maxFailedCenters);
-        nonConservativeReAssignByFailedAlgorithm(subGraph);
+        //nonConservativeReAssignByFailedAlgorithm(subGraph);
     }
 
     private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
@@ -211,7 +212,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
 
         MinCostMaxFlowService minCost = new MinCostMaxFlowService();
-        Map<Vertex, Set<Vertex>> flow = minCost.getFlow(subGraph, m, maxClientsPerCenter);
+        Map<Vertex, Set<Vertex>> flow = minCost
+                .getFlow(subGraph, m, maxClientsPerCenter);
         flow.forEach((from, to) -> {
             from.setColor(RED);
             from.setClients(to);
@@ -380,8 +382,47 @@ free node => node.getColor().equals(BLACK)
         }
     }
 
-    private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph) {
-        //TODO
+    private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
+        //TODO we need that subgraph when the original algorithm was successful
+        Map<Pair<Vertex, Vertex>, Vertex> X = new HashMap<>();
+
+        failedCenters.forEach(failed -> {
+            m1.forEach(monarch -> {
+                Set<Vertex> team = new HashSet<>(monarch.getMinors());
+                team.add(monarch);
+                if(!team.contains(failed)) {
+                    //select a different non-faulty center r from team(m)
+                    Vertex r = team.stream().filter(x -> !failedCenters.contains(x)).findAny().get();
+                    X.put(new Pair<>(failed, monarch), r);
+                }
+            });
+        });
+
+        //for each node v that was served by some f
+        failedCenters.forEach(failed -> {
+            failed.getClients().forEach(client -> {
+                //unique free place
+                Vertex freeV = subGraph.vertexSet().stream().filter(x -> !failedCenters.contains(x)
+                    && x.getColor() == RED && x.getClients().size() < maxClientsPerCenter).findAny().get();
+                //also add client to freev?
+
+                //MP = (m1, ... mj) path in T tree from failed to freeV's major
+                List<Vertex> MP = getTreePathTo(failed.getMajor(), freeV.getMajor());
+
+                Vertex releasedNode = client;
+                for(int i = 1; i < MP.size(); i++) {
+                    Vertex currentNode = X.get(new Pair<>(failed, MP.get(i)));
+                    X.put(new Pair<>(failed, MP.get(i)), releasedNode);
+                    releasedNode = currentNode;
+                }
+
+                if(releasedNode != null) {
+                    freeV.getClients().add(releasedNode);
+                    releasedNode.setCenter(freeV);
+                }
+
+            });
+        });
     }
 
     private void conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
@@ -596,5 +637,43 @@ free node => node.getColor().equals(BLACK)
                 .stream()
                 .filter(node -> node.getColor().equals(BLACK))
                 .collect(toList());
+    }
+
+    private List<Vertex> getTreePathTo(Vertex from, Vertex to) {
+        List<Vertex> ret = new ArrayList<>();
+        if(from == to) {
+            ret.add(from);
+            return ret;
+        }
+
+        List<Vertex> fromPath = new ArrayList<>();
+        Vertex iter = from;
+        fromPath.add(iter);
+        while(iter.getParent() != null) {
+            fromPath.add(iter);
+            iter = iter.getParent();
+        }
+        Collections.reverse(fromPath);
+
+        List<Vertex> toPath = new ArrayList<>();
+        iter = from;
+        toPath.add(iter);
+        while(iter.getParent() != null) {
+            toPath.add(iter);
+            iter = iter.getParent();
+        }
+        Collections.reverse(toPath);
+
+        while(!fromPath.isEmpty() && !toPath.isEmpty() &&fromPath.get(0) == toPath.get(0)) {
+            fromPath.remove(0);
+            toPath.remove(0);
+        }
+        Collections.reverse(fromPath);
+        ret.addAll(fromPath);
+        if(!toPath.isEmpty() && toPath.get(0).getParent() != null)
+            ret.add(toPath.get(0).getParent());
+        ret.addAll(toPath);
+
+        return ret;
     }
 }
