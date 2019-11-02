@@ -99,7 +99,7 @@ public class MinCostMaxFlowService {
             }
 
         monarchIndexes.forEach((v, i) -> {
-            v.getEmpire().forEach(x -> {
+            Utils.getAdjacentVerticesUpToDistance(graph, v.getMajor(), 2).forEach(x -> {
                 cap[i][vertexIndexes.get(x)] = 1;
                 cost[i][vertexIndexes.get(x)] = v == x ? 0 : 1;
             });
@@ -127,18 +127,5 @@ public class MinCostMaxFlowService {
                     ret.put(m, flowsTo);
                 });
         return ret;
-    }
-
-    //todo refactor - this appears twice
-    static private List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
-        List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
-        Set<Vertex> vertices = new HashSet<>(adjacentVertices);
-        vertices.add(source);
-        if (distance > 1) {
-            adjacentVertices.forEach(adjacentVertex ->
-                    vertices.addAll(getAdjacentVerticesUpToDistance(graph, adjacentVertex, distance - 1)));
-        }
-        //vertices.remove(source);
-        return new ArrayList<>(vertices);
     }
 }

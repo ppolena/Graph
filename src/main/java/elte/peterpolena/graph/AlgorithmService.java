@@ -58,6 +58,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                  int maxFailedCenters,
                                  boolean isConservative) {
 
+        graph.vertexSet().forEach(vertex -> vertex.clearData());
         System.out.println("K: " + maxCenters);
         System.out.println("L: " + maxClientsPerCenter);
 
@@ -91,7 +92,6 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                            boolean isConservative) {
 
         graph.vertexSet().forEach(vertex -> vertex.clearData());
-
         ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
 
         List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
@@ -168,15 +168,15 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             vertex.setMonarch();
             vertex.setMarked();
             m1.add(vertex);
-            getAdjacentVerticesUpToDistance(subGraph, vertex, 2).forEach(adjacentVertex -> {
+            Utils.getAdjacentVerticesUpToDistance(subGraph, vertex, 2).forEach(adjacentVertex -> {
                 if (!adjacentVertex.isMarked()) {
                     adjacentVertex.setMarked();
                     vertex.addToEmpire(adjacentVertex);
                 }
             });
-            intersection(vertex.getEmpire(), getAdjacentVerticesAtDistance(subGraph, vertex, 2))
+            intersection(vertex.getEmpire(), Utils.getAdjacentVerticesAtDistance(subGraph, vertex, 2))
                     .forEach(u ->
-                            getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(w -> {
+                            Utils.getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(w -> {
                                 if (!w.isMarked() && !unmarkedNodes.contains(w)) {
                                     w.setParent(vertex);
                                     w.setDeputy(u);
@@ -188,8 +188,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("M1 size: " + m1.size());
 
         m1.forEach(major -> {
-            List<Vertex> minors = shuffleAndReduceToSize(
-                    getAdjacentVerticesAtDistance(subGraph, major, 1)
+            List<Vertex> minors = Utils.shuffleAndReduceToSize(
+                    Utils.getAdjacentVerticesAtDistance(subGraph, major, 1)
                             .stream()
                             .filter(vertex -> !vertex.equals(major.getDeputy()))
                             .collect(toList()),
@@ -300,7 +300,7 @@ free node => node.getColor().equals(BLACK)
         monarchTree.forEach(major -> passed.put(major, new HashSet<>()));
 
         while(!monarchTree.isEmpty()) {
-            Vertex m = getALeaf(monarchTree);
+            Vertex m = Utils.getALeaf(monarchTree);
 
             int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
             int k = unassignedAndPassed / maxClientsPerCenter;
@@ -311,7 +311,7 @@ free node => node.getColor().equals(BLACK)
             //client => BLACK
 
             //select k' centers from m.getEmpire()
-            List<Vertex> centers = shuffleAndReduceToSize(m.getEmpire().stream().filter(x -> x.getColor() != RED)
+            List<Vertex> centers = Utils.shuffleAndReduceToSize(m.getEmpire().stream().filter(x -> x.getColor() != RED)
                     .collect(toList()), k);
             centers.forEach(center -> {
                 center.setColor(RED);
@@ -323,11 +323,11 @@ free node => node.getColor().equals(BLACK)
             unassignedAndPassedVertices.addAll(passed.get(m));
             List<Vertex> freeNodes = getFreeNodes(m.getEmpire());
             System.out.println("Free nodes: " + freeNodes);
-            List<Vertex> nodesToAssignToCenters = shuffleAndReduceToSize(freeNodes, k * maxClientsPerCenter);
+            List<Vertex> nodesToAssignToCenters = Utils.shuffleAndReduceToSize(freeNodes, k * maxClientsPerCenter);
 
             //select e free nodes
             freeNodes.removeAll(nodesToAssignToCenters);
-            List<Vertex> nodesToAssignToM = shuffleAndReduceToSize(freeNodes, e);
+            List<Vertex> nodesToAssignToM = Utils.shuffleAndReduceToSize(freeNodes, e);
 
             //create L sized sublist from k'L nodes
             List<List<Vertex>> partitionedNodesToAssignToCenters = partition(nodesToAssignToCenters, maxClientsPerCenter);
@@ -341,7 +341,7 @@ free node => node.getColor().equals(BLACK)
             }
 
             //release e nodes from dom(m) and assign e free nodes to m
-            List<Vertex> releasedClients = shuffleAndReduceToSize(new ArrayList<>(m.getClients()), e);
+            List<Vertex> releasedClients = Utils.shuffleAndReduceToSize(new ArrayList<>(m.getClients()), e);
             m.getClients().removeAll(releasedClients);
             releasedClients.forEach(client -> client.setCenter(null));
             m.addClients(new HashSet<>(nodesToAssignToM));
@@ -370,11 +370,12 @@ free node => node.getColor().equals(BLACK)
         //ceil(n/L) + α
         long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
 
+        System.out.println("Centers before end: " + centers + " - Required: " + requiredCenters);
         //if |M'| < ceil(n/L) + α
         if (centers < requiredCenters) {
             int centersNeeded = (int) (requiredCenters - centers);
             List<Vertex> freeNodes = getFreeNodes(new ArrayList<>(subGraph.vertexSet()));
-            shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
+            Utils.shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
         }
     }
 
@@ -387,27 +388,27 @@ free node => node.getColor().equals(BLACK)
         List<Vertex> vertices = new ArrayList<>(subGraph.vertexSet());
         unmarkedNodes.add(vertices.stream().findAny().get());
 
-        while(hasUnmarkedNodesFurther(subGraph, m1, 10)) {
+        while(Utils.hasUnmarkedNodesFurther(subGraph, m1, 10)) {
             Vertex vertex;
             if(m1.isEmpty()) {
                 vertex = unmarkedNodes.stream().findAny().get();
             }
             else {
-                vertex = getRandomVertexFromDistance(subGraph, m1, unmarkedNodes, 10);
+                vertex = Utils.getRandomVertexFromDistance(subGraph, m1, unmarkedNodes, 10);
             }
             m1.add(vertex); //major monarch
             vertex.setMonarch();
             vertex.setMarked();
-            getAdjacentVerticesUpToDistance(subGraph, vertex, 5).forEach(adjacentVertex -> {
+            Utils.getAdjacentVerticesUpToDistance(subGraph, vertex, 5).forEach(adjacentVertex -> {
                 if(!adjacentVertex.isMarked()) {
                     vertex.addToEmpire(adjacentVertex);
                     adjacentVertex.setMarked();
                 }
             });
 
-            intersection(vertex.getEmpire(), getAdjacentVerticesAtDistance(subGraph, vertex, 5))
+            intersection(vertex.getEmpire(), Utils.getAdjacentVerticesAtDistance(subGraph, vertex, 5))
                     .forEach(u ->
-                            getAdjacentVerticesAtDistance(subGraph, vertex, 5).forEach(w -> {
+                            Utils.getAdjacentVerticesAtDistance(subGraph, vertex, 5).forEach(w -> {
                                 if (!w.isMarked() && !unmarkedNodes.contains(w)) {
                                     w.setParent(vertex);
                                     w.setDeputy(u);
@@ -417,16 +418,16 @@ free node => node.getColor().equals(BLACK)
 
         }
         m1.forEach(m -> {
-            shuffleAndReduceToSize(getAdjacentVerticesAtDistance(subGraph, m, 1), maxFailedCenters).forEach(v -> {
+            Utils.shuffleAndReduceToSize(Utils.getAdjacentVerticesAtDistance(subGraph, m, 1), maxFailedCenters).forEach(v -> {
                 //TODO make them backup centers
             });
         });
 
         unmarkedNodes.clear();
         m1.forEach(m -> {
-            intersection(m.getEmpire(), getAdjacentVerticesAtDistance(subGraph, m, 5))
+            intersection(m.getEmpire(), Utils.getAdjacentVerticesAtDistance(subGraph, m, 5))
                 .forEach(u -> {
-                    getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(neighbor -> {
+                    Utils.getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(neighbor -> {
                         if(!neighbor.isMarked() && neighbor.getParent() == null && !unmarkedNodes.contains(neighbor)) {
                             neighbor.setParent(m);
                             unmarkedNodes.add(neighbor);
@@ -443,15 +444,15 @@ free node => node.getColor().equals(BLACK)
             vertex.setMarked();
             m2.add(vertex);
             //vertex.setParent(Parent(v))???
-            getAdjacentVerticesUpToDistance(subGraph, vertex, 5).forEach(adjacentVertex -> {
+            Utils.getAdjacentVerticesUpToDistance(subGraph, vertex, 5).forEach(adjacentVertex -> {
                 if (!adjacentVertex.isMarked()) {
                     adjacentVertex.setMarked();
                     vertex.addToEmpire(adjacentVertex);
                 }
             });
-            intersection(vertex.getEmpire(), getAdjacentVerticesAtDistance(subGraph, vertex, 5))
+            intersection(vertex.getEmpire(), Utils.getAdjacentVerticesAtDistance(subGraph, vertex, 5))
                     .forEach(u ->
-                            getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(neighbor -> {
+                            Utils.getAdjacentVerticesAtDistance(subGraph, u, 1).forEach(neighbor -> {
                                 if(!neighbor.isMarked() && neighbor.getParent() == null && !unmarkedNodes.contains(neighbor)) {
                                     neighbor.setParent(vertex);
                                     unmarkedNodes.add(neighbor);
@@ -484,7 +485,7 @@ free node => node.getColor().equals(BLACK)
         monarchTree.forEach(m -> passed.put(m, new HashSet<>()));
 
         while(!monarchTree.isEmpty()) {
-            Vertex m = getALeaf(monarchTree); //TODO remove a leaf node from T
+            Vertex m = Utils.getALeaf(monarchTree); //TODO remove a leaf node from T
 
             //for each node u at level-5 of m do:
                 int passedNum = passed.get(m).size();
@@ -562,38 +563,6 @@ free node => node.getColor().equals(BLACK)
         return requiredCenters;
     }
 
-    private List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
-        List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
-        Set<Vertex> vertices = new HashSet<>(adjacentVertices);
-        vertices.add(source);
-        if (distance > 1) {
-            adjacentVertices.forEach(adjacentVertex ->
-                    vertices.addAll(getAdjacentVerticesUpToDistance(graph, adjacentVertex, distance - 1)));
-        }
-        //vertices.remove(source);
-        return new ArrayList<>(vertices);
-    }
-
-    private List<Vertex> getAdjacentVerticesAtDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
-        Set<Vertex> vertices = new HashSet<>();
-        vertices.addAll(getAdjacentVerticesUpToDistance(graph, source, distance));
-        if(distance > 1)
-            vertices.removeAll(getAdjacentVerticesUpToDistance(graph, source, distance -1));
-        vertices.remove(source);
-        return new ArrayList<>(vertices);
-    }
-
-    private List<Vertex> shuffleAndReduceToSize(List<Vertex> vertices, int size) {
-        List<Vertex> list = new ArrayList<>(vertices);
-        Collections.shuffle(list);
-        if (size > list.size()) {
-            return list;
-        } else if (size < 0) {
-            return new ArrayList<>();
-        }
-        return list.subList(0, size);
-    }
-
     private int getEdgeCapacity(Graph<Vertex, WeightedEdgeWithCapacity> graph, WeightedEdgeWithCapacity edge) {
         return graph.getEdge(graph.getEdgeSource(edge), graph.getEdgeTarget(edge)).getCapacity();
     }
@@ -619,18 +588,6 @@ free node => node.getColor().equals(BLACK)
                 .stream()
                 .map(bipartiteGraph::getEdgeTarget)
                 .collect(toSet());
-    }
-
-    private boolean hasUnmarkedNodesFurther(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> fromSet, int distance) {
-        return true; //TODO implement
-    }
-
-    private Vertex getRandomVertexFromDistance(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> distanceFrom, List<Vertex> fromList, int distance) {
-        return new Vertex(0, 0, BLUE); //TODO implement
-    }
-
-    private Vertex getALeaf(Set<Vertex> tree) {
-        return tree.stream().filter(x -> tree.stream().noneMatch(y -> y.getParent() == x)).findAny().get();
     }
 
     private List<Vertex> getFreeNodes(List<Vertex> vertices) {
