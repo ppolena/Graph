@@ -150,6 +150,20 @@ vertex.getCenter() = ctr(v)
         return center;
     }
 
+    public void clearData() {
+        center = null;
+        clients.clear();
+        minors.clear();
+        major = null;
+        deputy = null;
+        isMonarch = false;
+        isMarked = false;
+        empire.clear();
+        parent = null;
+        children.clear();
+        setColor(Color.BLACK);
+    }
+
     public void setCenter(Vertex center) {
         this.center = center;
     }

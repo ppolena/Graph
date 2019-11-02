@@ -19,14 +19,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static elte.peterpolena.graph.Config.maxXCoordinate;
 import static elte.peterpolena.graph.Config.maxYCoordinate;
 import static elte.peterpolena.graph.Config.minXCoordinate;
 import static elte.peterpolena.graph.Config.minYCoordinate;
-import static java.awt.Color.BLACK;
-import static java.awt.Color.BLUE;
-import static java.awt.Color.RED;
+import static java.awt.Color.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
@@ -91,6 +90,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                            int maxFailedCenters,
                                            boolean isConservative) {
 
+        graph.vertexSet().forEach(vertex -> vertex.clearData());
+
         ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
 
         List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
@@ -123,6 +124,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
         long centers = graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
 
+        System.out.println("Allocated centers: " + centers);
         if (centers > maxCenters) {
             return false;
         }
@@ -134,6 +136,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                                int maxClientsPerCenter,
                                                int maxFailedCenters) {
 
+        m1.clear();
+        m2.clear();
+        m.clear();
         nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         nonConservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
         nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter, maxFailedCenters);
@@ -144,6 +149,10 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                             int maxCenters,
                                             int maxClientsPerCenter,
                                             int maxFailedCenters) {
+
+        m1.clear();
+        m2.clear();
+        m.clear();
         conservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         conservativeAssignDomainsAlgorithm(subGraph);
         conservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
@@ -201,18 +210,26 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
 
+        Map<Vertex, Set<Vertex>> flow = MinCostMaxFlowService.getFlow(subGraph, m, maxClientsPerCenter);
+        flow.forEach((from, to) -> {
+            from.setColor(RED);
+            from.setClients(to);
+            from.getClients().forEach(client -> client.setCenter(from));
+        });
         //Construct directed bipartite graph
-        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
+        /*Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
         subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
         //copy monarch set into bipartite graph
-        Set<Vertex> monarchs = new HashSet<>(m);
-        monarchs.forEach(bipartiteGraph::addVertex);
+        //Set<Vertex> monarchs = new HashSet<>();
+        Map<Vertex, Vertex> monarchCopies = new HashMap<>();
+        m.forEach(x -> monarchCopies.put(x, new Vertex(x.getX(), x.getY(), GREEN)));
+        monarchCopies.values().forEach(bipartiteGraph::addVertex);
         //E'
-        monarchs.forEach(monarch -> getAdjacentVerticesUpToDistance(subGraph, monarch.getMajor(), 2)
+        monarchCopies.forEach((original, monarch) -> getAdjacentVerticesUpToDistance(subGraph, original.getMajor(), 2)
                 .forEach(adjacentVertex -> {
-                    if (!monarch.equals(adjacentVertex)) {
+                    //if (!monarch.equals(adjacentVertex)) {
                         bipartiteGraph.addEdge(monarch, adjacentVertex);
-                    }
+                    //}
                 }));
 
         //add s and t
@@ -222,7 +239,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         bipartiteGraph.addVertex(target);
 
         //for m ∈ M add edge (s, m) and set (s, m) capacity to L
-        monarchs.forEach(monarch -> {
+        monarchCopies.values().forEach(monarch -> {
             bipartiteGraph.addEdge(source, monarch);
             bipartiteGraph.getEdge(source, monarch).setCapacity(maxClientsPerCenter);
         });
@@ -234,11 +251,11 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         });
 
         //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
-        monarchs.forEach(monarch -> subGraph.vertexSet()
+        monarchCopies.forEach((orig, monarch) -> subGraph.vertexSet()
                 .forEach(vertex -> {
                     if (bipartiteGraph.getEdge(monarch, vertex) != null) {
                         bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
-                        if (monarch.equals(vertex)) {
+                        if (orig.equals(vertex)) {
                             bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
                         }
                     }
@@ -254,10 +271,12 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                 .getFlowMap();
 
         //for m ∈ M add v to dom(m) if v receives one unit of flow from m
-        m.forEach(monarch -> {
-            monarch.setClients(getClients(bipartiteGraph, flowMap, monarch));
-            monarch.getClients().forEach(client -> client.setCenter(monarch));
-        });
+        monarchCopies.forEach((orig, monarch) -> {
+            orig.setColor(RED);
+            orig.setClients(getClients(bipartiteGraph, flowMap, monarch));
+            orig.getClients().forEach(client -> client.setCenter(orig));
+            System.out.println("monarch clients: " + orig.getClients().size());
+        });*/
     }
 
     private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter, int maxFailedCenters) {
@@ -286,12 +305,14 @@ free node => node.getColor().equals(BLACK)
             int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
             int k = unassignedAndPassed / maxClientsPerCenter;
             int e = unassignedAndPassed % maxClientsPerCenter;
+            System.out.println("unassignedAndPassed: " + unassignedAndPassed + " - k: " + k + " -  e: " + e);
 
             //center => RED
             //client => BLACK
 
             //select k' centers from m.getEmpire()
-            List<Vertex> centers = shuffleAndReduceToSize(m.getEmpire(), k);
+            List<Vertex> centers = shuffleAndReduceToSize(m.getEmpire().stream().filter(x -> x.getColor() != RED)
+                    .collect(toList()), k);
             centers.forEach(center -> {
                 center.setColor(RED);
                 //center.setCenter(center); not sure about this
@@ -300,7 +321,7 @@ free node => node.getColor().equals(BLACK)
             //select k'L free nodes from unassigned(m) + passed(m)
             List<Vertex> unassignedAndPassedVertices = new ArrayList<>(unassigned.get(m));
             unassignedAndPassedVertices.addAll(passed.get(m));
-            List<Vertex> freeNodes = getFreeNodes(unassignedAndPassedVertices);
+            List<Vertex> freeNodes = getFreeNodes(m.getEmpire());
             System.out.println("Free nodes: " + freeNodes);
             List<Vertex> nodesToAssignToCenters = shuffleAndReduceToSize(freeNodes, k * maxClientsPerCenter);
 
@@ -331,11 +352,13 @@ free node => node.getColor().equals(BLACK)
             if (m.getParent() != null) {
                 passed.get(m.getParent()).addAll(releasedClients);
             } else {
-                freeNodes = getFreeNodes(unassignedAndPassedVertices);
-                Vertex center = freeNodes.stream().findAny().get();
-                center.setColor(RED);
-                center.addClients(new HashSet<>(releasedClients));
-                center.getClients().forEach(client -> client.setCenter(center));
+                if(!releasedClients.isEmpty()) {
+                    freeNodes = getFreeNodes(m.getEmpire());
+                    Vertex center = freeNodes.stream().findAny().get();
+                    center.setColor(RED);
+                    center.addClients(new HashSet<>(releasedClients));
+                    center.getClients().forEach(client -> client.setCenter(center));
+                }
             }
 
             monarchTree.remove(m);
@@ -542,21 +565,21 @@ free node => node.getColor().equals(BLACK)
     private List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
         List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
         Set<Vertex> vertices = new HashSet<>(adjacentVertices);
+        vertices.add(source);
         if (distance > 1) {
             adjacentVertices.forEach(adjacentVertex ->
                     vertices.addAll(getAdjacentVerticesUpToDistance(graph, adjacentVertex, distance - 1)));
         }
+        //vertices.remove(source);
         return new ArrayList<>(vertices);
     }
 
     private List<Vertex> getAdjacentVerticesAtDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
-        List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
         Set<Vertex> vertices = new HashSet<>();
-        if (distance == 0) {
-            vertices.addAll(adjacentVertices);
-        } else {
-            adjacentVertices.forEach(vertex -> vertices.addAll(getAdjacentVerticesAtDistance(graph, vertex, distance - 1)));
-        }
+        vertices.addAll(getAdjacentVerticesUpToDistance(graph, source, distance));
+        if(distance > 1)
+            vertices.removeAll(getAdjacentVerticesUpToDistance(graph, source, distance -1));
+        vertices.remove(source);
         return new ArrayList<>(vertices);
     }
 
