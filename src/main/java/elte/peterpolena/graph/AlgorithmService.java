@@ -210,7 +210,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
 
-        Map<Vertex, Set<Vertex>> flow = MinCostMaxFlowService.getFlow(subGraph, m, maxClientsPerCenter);
+        MinCostMaxFlowService minCost = new MinCostMaxFlowService();
+        Map<Vertex, Set<Vertex>> flow = minCost.getFlow(subGraph, m, maxClientsPerCenter);
         flow.forEach((from, to) -> {
             from.setColor(RED);
             from.setClients(to);

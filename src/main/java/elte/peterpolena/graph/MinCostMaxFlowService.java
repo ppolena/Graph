@@ -7,12 +7,12 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import java.util.*;
 
 public class MinCostMaxFlowService {
-    static boolean found[];
-    static int N, cap[][], flow[][], cost[][], dad[], dist[], pi[];
+    private boolean found[];
+    private int N, cap[][], flow[][], cost[][], dad[], dist[], pi[];
 
-    static final int INF = Integer.MAX_VALUE / 2 - 1;
+    private final int INF = Integer.MAX_VALUE / 2 - 1;
 
-    static boolean search(int source, int sink) {
+    private boolean search(int source, int sink) {
         Arrays.fill(found, false);
         Arrays.fill(dist, INF);
         dist[source] = 0;
@@ -47,7 +47,7 @@ public class MinCostMaxFlowService {
     }
 
 
-    static int[] getMaxFlow(int caps[][], int costs[][], int source, int sink) {
+    private int[] getMaxFlow(int caps[][], int costs[][], int source, int sink) {
         cap = caps;
         cost = costs;
 
@@ -79,7 +79,7 @@ public class MinCostMaxFlowService {
         return new int[]{ totflow, totcost };
     }
 
-    static public Map<Vertex, Set<Vertex>> getFlow(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> monarchs, int maxClientsPerCenter) {
+    public Map<Vertex, Set<Vertex>> getFlow(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> monarchs, int maxClientsPerCenter) {
         Map<Vertex, Set<Vertex>> ret = new HashMap<>();
         N = graph.vertexSet().size() + monarchs.size() + 2;
         Map<Vertex, Integer> monarchIndexes = new HashMap<>();
