@@ -3,12 +3,12 @@ package elte.peterpolena.graph;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultUndirectedWeightedGraph;
 import org.jgrapht.graph.DefaultWeightedEdge;
+import org.springframework.stereotype.Service;
 
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
 
-import static elte.peterpolena.graph.Config.centersSliderStartValue;
 import static elte.peterpolena.graph.Config.clientsSliderStartValue;
 import static elte.peterpolena.graph.Config.frameHeight;
 import static elte.peterpolena.graph.Config.frameWidth;
@@ -20,6 +20,7 @@ import static elte.peterpolena.graph.Config.sliderPanelHeight;
 import static elte.peterpolena.graph.Config.sliderPanelWidth;
 import static java.awt.event.ItemEvent.SELECTED;
 
+@Service
 public class Window {
 
     private JFrame frame;
@@ -47,14 +48,14 @@ public class Window {
 
         GraphGenerator graphGenerator = new GraphGenerator();
 
-        JSlider centerSlider = new JSlider(SwingConstants.HORIZONTAL, sliderMinValue, sliderMaxValue, centersSliderStartValue);
-        centerSlider.setMinorTickSpacing(1);
-        centerSlider.setMajorTickSpacing(1);
-        centerSlider.setPaintTicks(true);
-        centerSlider.setPaintLabels(true);
-        centerSlider.setSnapToTicks(true);
-        centerSlider.setName("CentersSlider");
-        JLabel centersLabel = new JLabel("Centers");
+//        JSlider centerSlider = new JSlider(SwingConstants.HORIZONTAL, sliderMinValue, sliderMaxValue, centersSliderStartValue);
+//        centerSlider.setMinorTickSpacing(1);
+//        centerSlider.setMajorTickSpacing(1);
+//        centerSlider.setPaintTicks(true);
+//        centerSlider.setPaintLabels(true);
+//        centerSlider.setSnapToTicks(true);
+//        centerSlider.setName("CentersSlider");
+//        JLabel centersLabel = new JLabel("Centers");
 
         JSlider nodesSlider = new JSlider(SwingConstants.HORIZONTAL, sliderMinValue, sliderMaxValue, clientsSliderStartValue);
         nodesSlider.setMinorTickSpacing(1);
@@ -63,12 +64,13 @@ public class Window {
         nodesSlider.setPaintLabels(true);
         nodesSlider.setSnapToTicks(true);
         nodesSlider.setName("NodesSlider");
-        JLabel NodesLabel = new JLabel("Nodes");
+        JLabel NodesLabel = new JLabel("Nodes (V)");
 
         JCheckBox randomizedPlacementCheckBox = new JCheckBox("Randomized placement", randomizedPlacement);
         randomizedPlacementCheckBox.addItemListener(e -> {
             randomizedPlacement = e.getStateChange() == SELECTED;
-            drawGraph(graphGenerator.generate(centerSlider.getValue(), nodesSlider.getValue(), randomizedPlacement));
+            this.graph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
+            drawGraph(this.graph);
         });
 
         JCheckBox showEdgeWeightCheckbox = new JCheckBox("Show edge weight", showEdgeWeight);
@@ -78,28 +80,38 @@ public class Window {
         });
 
         JButton reloadButton = new JButton("Reload");
-        reloadButton.addActionListener(e -> drawGraph(graphGenerator.generate(centerSlider.getValue(), nodesSlider.getValue(), randomizedPlacement)));
+        reloadButton.addActionListener(e -> {
+            this.graph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
+            drawGraph(this.graph);
+        });
 
         JSpinner maxCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
         ((JSpinner.DefaultEditor) maxCentersSpinner.getEditor()).getTextField().setEditable(false);
         maxCentersSpinner.addChangeListener(e -> this.maxCentersValue = (int) maxCentersSpinner.getValue());
-        JLabel maxCentersLabel = new JLabel("Centers");
+        JLabel maxCentersLabel = new JLabel("Max Centers (K)");
 
         JSpinner maxClientsPerCenterSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxClientsPerCenter, 1));
         ((JSpinner.DefaultEditor) maxClientsPerCenterSpinner.getEditor()).getTextField().setEditable(false);
         maxClientsPerCenterSpinner.addChangeListener(e -> this.maxClientsPerCentersValue = (int) maxClientsPerCenterSpinner.getValue());
-        JLabel maxClientsPerCenterLabel = new JLabel("Max Clients Per Centers");
+        JLabel maxClientsPerCenterLabel = new JLabel("Max Clients Per Centers (L)");
 
         JButton executeMainAlgorithmButton = new JButton("Execute Main Algorithm");
-        executeMainAlgorithmButton.addActionListener(e -> algorithmService.mainAlgorithm(this.graph, this.maxCentersValue, this.maxClientsPerCentersValue, 2, false));
+        executeMainAlgorithmButton.addActionListener(e -> {
+            if (algorithmService.mainAlgorithm(this.graph, this.maxCentersValue, this.maxClientsPerCentersValue, 2, false)) {
+                drawGraph(this.graph);
+            } else {
+                System.out.println("NOT SOLVABLE");
+            }
+        });
 
         ChangeListener optionsChangeListener = e -> {
             JSlider slider = (JSlider) e.getSource();
             if (!slider.getValueIsAdjusting()) {
-                drawGraph(graphGenerator.generate(centerSlider.getValue(), nodesSlider.getValue(), randomizedPlacement));
+                this.graph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
+                drawGraph(this.graph);
             }
         };
-        centerSlider.addChangeListener(optionsChangeListener);
+//        centerSlider.addChangeListener(optionsChangeListener);
         nodesSlider.addChangeListener(optionsChangeListener);
 
         JPanel optionsPanel = new JPanel();
@@ -125,7 +137,7 @@ public class Window {
         this.frame.setVisible(true);
     }
 
-    private void drawGraph(Graph<Vertex, DefaultWeightedEdge> graph) {
+    public void drawGraph(Graph<Vertex, DefaultWeightedEdge> graph) {
         this.frame.remove(graphPainter);
         this.frame.validate();
         this.frame.repaint();

@@ -8,6 +8,7 @@ import org.jgrapht.alg.flow.mincost.MinimumCostFlowProblem.MinimumCostFlowProble
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -46,7 +47,8 @@ getAdjacentVerticesUpToDistance(Gw, v, i) = Γi(v)
 getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
  */
 
-
+    @Autowired
+    private Window window;
     private Set<Vertex> m1 = new HashSet<>();
     private Set<Vertex> m2 = new HashSet<>();
     private Set<Vertex> m = new HashSet<>();
@@ -56,6 +58,10 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                  int maxClientsPerCenter,
                                  int maxFailedCenters,
                                  boolean isConservative) {
+
+        System.out.println("K: " + maxCenters);
+        System.out.println("L: " + maxClientsPerCenter);
+
         List<DefaultWeightedEdge> edges = new ArrayList<>(graph.edgeSet());
         Comparator<DefaultWeightedEdge> byWeight = getDefaultWeightedEdgeComparator(graph);
         edges.sort(byWeight);
@@ -68,6 +74,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             addEdgesUpToMaxWeightToSubGraph(graph, subGraph, maxWeight);
             subGraphs.add(subGraph);
         });
+
+        System.out.println("Subgraphs: " + subGraphs.size());
 
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
             if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
@@ -82,6 +90,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                            int maxClientsPerCenter,
                                            int maxFailedCenters,
                                            boolean isConservative) {
+
         ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
 
         List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
@@ -91,6 +100,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         List<Integer> requiredCentersPerComponent = getRequiredCentersPerComponent(maxClientsPerCenter, componentNodeCount);
 
         int requiredCenters = getRequiredCenters(requiredCentersPerComponent);
+
+        System.out.println("Kw: " + requiredCenters);
 
         if (requiredCenters > maxCenters) {
             return false;
@@ -102,19 +113,27 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                         .map(vertices -> getSubGraph(graph, vertices))
                         .collect(toSet());
 
+        System.out.println("Subgraph connected components: " + subGraphs.size());
+
         if (isConservative) {
             subGraphs.forEach(x -> callConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
         } else {
-            subGraphs.forEach(x -> callNonConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
+            subGraphs.forEach(x -> callNonConservativeAlgorithms(x, maxClientsPerCenter, maxFailedCenters));
+        }
+
+        long centers = graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
+
+        if (centers > maxCenters) {
+            return false;
         }
 
         return true;
     }
 
     private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
-                                               int maxCenters,
                                                int maxClientsPerCenter,
                                                int maxFailedCenters) {
+
         nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         nonConservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
         nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter, maxFailedCenters);
@@ -157,6 +176,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                             }));
         }
 
+        System.out.println("M1 size: " + m1.size());
+
         m1.forEach(major -> {
             List<Vertex> minors = shuffleAndReduceToSize(
                     getAdjacentVerticesAtDistance(subGraph, major, 1)
@@ -170,6 +191,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             minors.forEach(minor -> minor.setMajor(major));
             major.setMajor(major);
         });
+
+        System.out.println("M2 size: " + m2.size());
 
         // M = M1 UNION M2
         m.addAll(m1);
@@ -186,7 +209,11 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         monarchs.forEach(bipartiteGraph::addVertex);
         //E'
         monarchs.forEach(monarch -> getAdjacentVerticesUpToDistance(subGraph, monarch.getMajor(), 2)
-                .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, adjacentVertex)));
+                .forEach(adjacentVertex -> {
+                    if (!monarch.equals(adjacentVertex)) {
+                        bipartiteGraph.addEdge(monarch, adjacentVertex);
+                    }
+                }));
 
         //add s and t
         Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
@@ -209,9 +236,11 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
         monarchs.forEach(monarch -> subGraph.vertexSet()
                 .forEach(vertex -> {
-                    bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
-                    if (monarch.equals(vertex)) {
-                        bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
+                    if (bipartiteGraph.getEdge(monarch, vertex) != null) {
+                        bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
+                        if (monarch.equals(vertex)) {
+                            bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
+                        }
                     }
                 }));
 
@@ -221,7 +250,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                         bipartiteGraph,
                         vertex -> getVertexSupply(source, target, vertex),
                         edge -> getEdgeCapacity(bipartiteGraph, edge), //max directed edge capacity
-                        edge -> getEdgeCapacity(bipartiteGraph, edge))) //min directed edge capacity
+                        edge -> 0)) //min directed edge capacity
                 .getFlowMap();
 
         //for m ∈ M add v to dom(m) if v receives one unit of flow from m
@@ -272,6 +301,7 @@ free node => node.getColor().equals(BLACK)
             List<Vertex> unassignedAndPassedVertices = new ArrayList<>(unassigned.get(m));
             unassignedAndPassedVertices.addAll(passed.get(m));
             List<Vertex> freeNodes = getFreeNodes(unassignedAndPassedVertices);
+            System.out.println("Free nodes: " + freeNodes);
             List<Vertex> nodesToAssignToCenters = shuffleAndReduceToSize(freeNodes, k * maxClientsPerCenter);
 
             //select e free nodes
@@ -292,14 +322,16 @@ free node => node.getColor().equals(BLACK)
             //release e nodes from dom(m) and assign e free nodes to m
             List<Vertex> releasedClients = shuffleAndReduceToSize(new ArrayList<>(m.getClients()), e);
             m.getClients().removeAll(releasedClients);
+            releasedClients.forEach(client -> client.setCenter(null));
             m.addClients(new HashSet<>(nodesToAssignToM));
 
             //add releasedClients to passed(Parent(m)) if m.getParent() != null
             //else
-            //create a new center from freeNodes and assign releaseClients to it
+            //create a new center from freeNodes and assign releasedClients to it
             if (m.getParent() != null) {
                 passed.get(m.getParent()).addAll(releasedClients);
             } else {
+                freeNodes = getFreeNodes(unassignedAndPassedVertices);
                 Vertex center = freeNodes.stream().findAny().get();
                 center.setColor(RED);
                 center.addClients(new HashSet<>(releasedClients));

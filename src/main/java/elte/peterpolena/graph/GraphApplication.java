@@ -10,8 +10,6 @@ public class GraphApplication {
 
 		SpringApplicationBuilder builder = new SpringApplicationBuilder(GraphApplication.class);
 		builder.headless(false).run(args);
-
-		new Window();
 	}
 
 }

@@ -27,5 +27,5 @@ public class Config {
     public static final int minWeight = 1;
     public static final int maxWeight = 10;
     public static final int maxCenters = 10;
-    public static final int maxClientsPerCenter = 5;
+    public static final int maxClientsPerCenter = 10;
 }
