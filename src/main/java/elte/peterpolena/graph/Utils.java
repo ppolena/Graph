@@ -3,12 +3,158 @@ package elte.peterpolena.graph;
 import org.jgrapht.Graph;
 import org.jgrapht.Graphs;
 import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.graph.SimpleWeightedGraph;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
+import static java.awt.Color.BLACK;
 import static java.awt.Color.BLUE;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 public class Utils {
+
+    static public Graph<Vertex, DefaultWeightedEdge> getSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> vertices) {
+        Graph<Vertex, DefaultWeightedEdge> subGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        vertices.forEach(subGraph::addVertex);
+        List<Vertex> vertexList = new ArrayList<>(vertices);
+        for (int i = 0; i < vertices.size() - 1; ++i) {
+            for (int j = i + 1; j < vertices.size(); ++j) {
+                Vertex vertex1 = vertexList.get(i);
+                Vertex vertex2 = vertexList.get(j);
+                if (graph.containsEdge(vertex1, vertex2)) {
+                    subGraph.addEdge(vertex1, vertex2, graph.getEdge(vertex1, vertex2));
+                }
+            }
+        }
+        return subGraph;
+    }
+
+    static public void addEdgesUpToMaxWeightToSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Graph<Vertex, DefaultWeightedEdge> subGraph, double maxWeight) {
+        graph.edgeSet()
+                .stream()
+                .filter(edgeToFilter -> graph.getEdgeWeight(edgeToFilter) <= maxWeight)
+                .collect(toList())
+                .forEach(edgeToAdd -> subGraph
+                        .addEdge(
+                                graph.getEdgeSource(edgeToAdd),
+                                graph.getEdgeTarget(edgeToAdd),
+                                edgeToAdd));
+    }
+
+    static public Comparator<DefaultWeightedEdge> getDefaultWeightedEdgeComparator(Graph<Vertex, DefaultWeightedEdge> graph) {
+        return (DefaultWeightedEdge edge1, DefaultWeightedEdge edge2) -> {
+            if (graph.getEdgeWeight(edge1) < graph.getEdgeWeight(edge2)) {
+                return -1;
+            }
+            if (graph.getEdgeWeight(edge1) > graph.getEdgeWeight(edge2)) {
+                return 1;
+            }
+            return 0;
+        };
+    }
+
+    static public List<Integer> getComponentNodeCount(List<Set<Vertex>> connectedComponents) {
+        return connectedComponents
+                .stream()
+                .map(Set::size)
+                .collect(toList());
+    }
+
+    static public List<Integer> getRequiredCentersPerComponent(int maxClientsPerCenter, List<Integer> componentNodeCount) {
+        return componentNodeCount
+                .stream()
+                .map(cnc ->
+                        (int) Math.ceil((double) cnc / maxClientsPerCenter))
+                .collect(toList());
+    }
+
+    static public int getRequiredCenters(List<Integer> requiredCentersPerComponent) {
+        int requiredCenters = 0;
+        for (int requiredCenterForComponent : requiredCentersPerComponent) {
+            requiredCenters += requiredCenterForComponent;
+        }
+        return requiredCenters;
+    }
+
+    static public int getEdgeCapacity(Graph<Vertex, WeightedEdgeWithCapacity> graph, WeightedEdgeWithCapacity edge) {
+        return graph.getEdge(graph.getEdgeSource(edge), graph.getEdgeTarget(edge)).getCapacity();
+    }
+
+    static public int getVertexSupply(Vertex source, Vertex target, Vertex vertex) {
+        if (vertex.equals(source)) {
+            return 1;
+        } else if (vertex.equals(target)) {
+            return -1;
+        } else {
+            return 0;
+        }
+    }
+
+    static public Set<Vertex> getClients(Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph, Map<WeightedEdgeWithCapacity, Double> flowMap, Vertex monarch) {
+        return flowMap
+                .keySet()
+                .stream()
+                .filter(edge -> bipartiteGraph
+                        .getEdgeSource(edge)
+                        .equals(monarch) && flowMap.get(edge) != 0)
+                .collect(toSet())
+                .stream()
+                .map(bipartiteGraph::getEdgeTarget)
+                .collect(toSet());
+    }
+
+    static public List<Vertex> getFreeNodes(List<Vertex> vertices) {
+        return vertices
+                .stream()
+                .filter(node -> node.getColor().equals(BLACK))
+                .collect(toList());
+    }
+
+    static public List<Vertex> getTreePathTo(Vertex from, Vertex to) {
+        List<Vertex> ret = new ArrayList<>();
+        if (from == to) {
+            ret.add(from);
+            return ret;
+        }
+
+        List<Vertex> fromPath = new ArrayList<>();
+        Vertex iter = from;
+        fromPath.add(iter);
+        while (iter.getParent() != null) {
+            fromPath.add(iter);
+            iter = iter.getParent();
+        }
+        Collections.reverse(fromPath);
+
+        List<Vertex> toPath = new ArrayList<>();
+        iter = from;
+        toPath.add(iter);
+        while (iter.getParent() != null) {
+            toPath.add(iter);
+            iter = iter.getParent();
+        }
+        Collections.reverse(toPath);
+
+        while (!fromPath.isEmpty() && !toPath.isEmpty() && fromPath.get(0) == toPath.get(0)) {
+            fromPath.remove(0);
+            toPath.remove(0);
+        }
+        Collections.reverse(fromPath);
+        ret.addAll(fromPath);
+        if (!toPath.isEmpty() && toPath.get(0).getParent() != null)
+            ret.add(toPath.get(0).getParent());
+        ret.addAll(toPath);
+
+        return ret;
+    }
+
     static public List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
         List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
         Set<Vertex> vertices = new HashSet<>(adjacentVertices);
