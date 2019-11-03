@@ -210,16 +210,6 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     }
 
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
-
-        MinCostMaxFlowService minCost = new MinCostMaxFlowService();
-        Map<Vertex, Set<Vertex>> flow = minCost
-                .getFlow(subGraph, m, maxClientsPerCenter);
-        flow.forEach((from, to) -> {
-            from.setColor(RED);
-            from.setClients(to);
-            from.getClients().forEach(client -> client.setCenter(from));
-        });
-
         //for displaying purposes, the graph we constructed was:
         Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
         subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
@@ -269,6 +259,16 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                         }
                     }
                 }));
+
+        //Calculating minCostMaxFlow
+        MinCostMaxFlowService minCost = new MinCostMaxFlowService();
+        Map<Vertex, Set<Vertex>> flow = minCost
+                .getFlow(subGraph, m, maxClientsPerCenter);
+        flow.forEach((from, to) -> {
+            from.setColor(RED);
+            from.setClients(to);
+            from.getClients().forEach(client -> client.setCenter(from));
+        });
 
         //Construct directed bipartite graph
         /*Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
