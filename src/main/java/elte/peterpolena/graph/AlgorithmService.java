@@ -9,7 +9,6 @@ import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,7 +25,6 @@ import static elte.peterpolena.graph.Utils.getALeaf;
 import static elte.peterpolena.graph.Utils.getAdjacentVerticesAtDistance;
 import static elte.peterpolena.graph.Utils.getAdjacentVerticesUpToDistance;
 import static elte.peterpolena.graph.Utils.getComponentNodeCount;
-import static elte.peterpolena.graph.Utils.getDefaultWeightedEdgeComparator;
 import static elte.peterpolena.graph.Utils.getFreeNodes;
 import static elte.peterpolena.graph.Utils.getRandomVertexFromDistance;
 import static elte.peterpolena.graph.Utils.getRequiredCenters;
@@ -61,38 +59,51 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     private Set<Vertex> m1 = new HashSet<>();
     private Set<Vertex> m2 = new HashSet<>();
     private Set<Vertex> m = new HashSet<>();
+    private Result result = new Result();
 
-    public boolean mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
+    public Result mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
                                  int maxCenters,
                                  int maxClientsPerCenter,
                                  int maxFailedCenters,
                                  boolean isConservative) {
 
-        graph.vertexSet().forEach(Vertex::clearData);
-        System.out.println("K: " + maxCenters);
-        System.out.println("L: " + maxClientsPerCenter);
+        System.out.println("\nSTART MAIN ALGORITHM\n");
 
-        List<DefaultWeightedEdge> edges = new ArrayList<>(graph.edgeSet());
-        Comparator<DefaultWeightedEdge> byWeight = getDefaultWeightedEdgeComparator(graph);
-        edges.sort(byWeight);
+        graph.vertexSet().forEach(Vertex::clearData);
+        System.out.println("\tK: " + maxCenters);
+        System.out.println("\tL: " + maxClientsPerCenter);
+
+        result.setOriginalGraph(graph);
+
+        List<Double> weights = graph
+                .edgeSet()
+                .stream()
+                .map(graph::getEdgeWeight)
+                .collect(toSet())
+                .stream()
+                .sorted()
+                .collect(toList());
 
         List<Graph<Vertex, DefaultWeightedEdge>> subGraphs = new ArrayList<>();
-        edges.forEach(edge -> {
-            double maxWeight = graph.getEdgeWeight(edge);
+        weights.forEach(weight -> {
             Graph<Vertex, DefaultWeightedEdge> subGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
             graph.vertexSet().forEach(subGraph::addVertex);
-            addEdgesUpToMaxWeightToSubGraph(graph, subGraph, maxWeight);
+            addEdgesUpToMaxWeightToSubGraph(graph, subGraph, weight);
             subGraphs.add(subGraph);
         });
 
-        System.out.println("Subgraphs: " + subGraphs.size());
+        result.setSubGraphsOfOriginalGraphByWeight(subGraphs);
+        System.out.println("\tSubGraphs: " + subGraphs.size());
 
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
             if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
-                return true;
+                result.setResult(graph);
+                System.out.println("\nEND MAIN ALGORITHM\n");
+                return result;
             }
         }
-        return false;
+        System.out.println("\nEND MAIN ALGORITHM\n");
+        return null;
     }
 
     private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
@@ -100,6 +111,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                                            int maxClientsPerCenter,
                                            int maxFailedCenters,
                                            boolean isConservative) {
+
+        System.out.println("\nSTART ASSIGN CENTERS ALGORITHM\n");
 
         graph.vertexSet().forEach(Vertex::clearData);
         ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
@@ -112,7 +125,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
         int requiredCenters = getRequiredCenters(requiredCentersPerComponent);
 
-        System.out.println("Kw: " + requiredCenters);
+        System.out.println("\tKw: " + requiredCenters);
 
         if (requiredCenters > maxCenters) {
             return false;
@@ -124,7 +137,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                         .map(vertices -> getSubGraph(graph, vertices))
                         .collect(toSet());
 
-        System.out.println("Subgraph connected components: " + subGraphs.size());
+        result.addConnectedComponentsOfSubGraph(subGraphs);
+        System.out.println("\tSubGraph connected components: " + subGraphs.size());
 
         if (isConservative) {
             subGraphs.forEach(x -> callConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
@@ -134,8 +148,13 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
         long centers = graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
 
-        System.out.println("Allocated centers: " + centers);
-        return centers <= maxCenters;
+        boolean centersBelowOrEqualToMaxCenters = centers <= maxCenters;
+
+        System.out.println("\tAllocated centers: " + centers);
+        System.out.println("\tMax centers: " + maxCenters);
+        System.out.printf("\tAllocated centers <= Max centers: " + centersBelowOrEqualToMaxCenters);
+        System.out.println("\n\nEND ASSIGN CENTERS ALGORITHM\n");
+        return centersBelowOrEqualToMaxCenters;
     }
 
     private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
@@ -165,6 +184,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     }
 
     private void nonConservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
+
+        System.out.println("\nSTART SELECT MONARCHS ALGORITHM\n");
+
         List<Vertex> unmarkedNodes = new ArrayList<>();
         List<Vertex> vertices = new ArrayList<>(subGraph.vertexSet());
         unmarkedNodes.add(vertices.stream().findAny().get());
@@ -191,7 +213,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                             }));
         }
 
-        System.out.println("M1 size: " + m1.size());
+        System.out.println("\tM1 size: " + m1.size());
 
         m1.forEach(major -> {
             List<Vertex> minors = shuffleAndReduceToSize(
@@ -207,14 +229,25 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             major.setMajor(major);
         });
 
-        System.out.println("M2 size: " + m2.size());
+        System.out.println("\tM2 size: " + m2.size());
 
         // M = M1 UNION M2
         m.addAll(m1);
         m.addAll(m2);
+
+        System.out.println("\tM size: " + m.size());
+
+        result.addMajorMonarchs(m1);
+        result.addMinorMonarchs(m2);
+        result.addMonarchs(m);
+
+        System.out.println("\nEND SELECT MONARCHS ALGORITHM\n");
     }
 
     private void nonConservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
+
+        System.out.println("\nSTART ASSIGN DOMAINS ALGORITHM\n");
+        System.out.println("\tConstructing bipartite graph...");
 
         Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
         subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
@@ -261,6 +294,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                     }
                 }));
 
+        result.addBipartiteGraphFromMonarchsAndSubGraph(bipartiteGraph);
+
+        System.out.println("\tCalculating Minimum Cost Maximum Flow...");
         //Calculating minCostMaxFlow
         MinCostMaxFlowService minCost = new MinCostMaxFlowService();
         Map<Vertex, Set<Vertex>> flow = minCost
@@ -270,6 +306,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             from.setClients(to);
             from.getClients().forEach(client -> client.setCenter(from));
         });
+
+        System.out.println("\nEND ASSIGN DOMAINS ALGORITHM\n");
 
 //        //Construct directed bipartite graph
 //        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
@@ -340,6 +378,8 @@ unassigned(m) => foreach m ∈ m1: foreach v ∈ m.getEmpire(): v.getCenter() ==
 free node => node.getColor().equals(BLACK)
  */
 
+        System.out.println("\nSTART REASSIGN ALGORITHM\n");
+
         Map<Vertex, Set<Vertex>> unassigned = new HashMap<>();
         Map<Vertex, Set<Vertex>> passed = new HashMap<>();
 
@@ -360,7 +400,9 @@ free node => node.getColor().equals(BLACK)
             int unassignedAndPassed = unassigned.get(m).size() + passed.get(m).size();
             int k = unassignedAndPassed / maxClientsPerCenter;
             int e = unassignedAndPassed % maxClientsPerCenter;
-            System.out.println("unassignedAndPassed: " + unassignedAndPassed + " - k: " + k + " -  e: " + e);
+            System.out.println("\tUnassigned + passed nodes: " + unassignedAndPassed);
+            System.out.println("\tk': " + k);
+            System.out.println("\te: " + e);
 
             //center => RED
             //client => BLACK
@@ -372,7 +414,6 @@ free node => node.getColor().equals(BLACK)
             //select k'L free nodes from unassigned(m) + passed(m)
             List<Vertex> unassignedAndPassedVertices = new ArrayList<>(unassigned.get(m));
             unassignedAndPassedVertices.addAll(passed.get(m));
-            System.out.println("Unassigned + passed nodes: " + unassignedAndPassedVertices);
             List<Vertex> nodesToAssignToCenters = shuffleAndReduceToSize(unassignedAndPassedVertices, k * maxClientsPerCenter);
 
             //select e free nodes
@@ -421,13 +462,16 @@ free node => node.getColor().equals(BLACK)
         //ceil(n/L) + α
         long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
 
-        System.out.println("Centers before end: " + centers + " - Required: " + requiredCenters);
+        System.out.println("\tCenters before end: " + centers);
+        System.out.println("\tRequired: " + requiredCenters);
         //if |M'| < ceil(n/L) + α
         if (centers < requiredCenters) {
             int centersNeeded = (int) (requiredCenters - centers);
             List<Vertex> freeNodes = getFreeNodes(new ArrayList<>(subGraph.vertexSet()));
             shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
         }
+
+        System.out.println("\nEND REASSIGN ALGORITHM\n");
     }
 
     private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {

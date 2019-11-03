@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 import static elte.peterpolena.graph.Config.clientsSliderStartValue;
 import static elte.peterpolena.graph.Config.frameHeight;
@@ -18,6 +20,7 @@ import static elte.peterpolena.graph.Config.sliderMaxValue;
 import static elte.peterpolena.graph.Config.sliderMinValue;
 import static elte.peterpolena.graph.Config.sliderPanelHeight;
 import static elte.peterpolena.graph.Config.sliderPanelWidth;
+import static elte.peterpolena.graph.Config.timerDelay;
 import static java.awt.event.ItemEvent.SELECTED;
 
 @Service
@@ -30,11 +33,11 @@ public class Window {
     private boolean showEdgeWeight = true;
     private int maxCentersValue;
     private int maxClientsPerCentersValue;
+    private AlgorithmService algorithmService;
 
     public Window(){
 
-        AlgorithmService algorithmService = new AlgorithmService();
-
+        this.algorithmService = new AlgorithmService();
         this.frame = new JFrame("Graph");
         this.frame.setSize(frameWidth, frameHeight);
         this.frame.setLocationRelativeTo(null);
@@ -97,11 +100,7 @@ public class Window {
 
         JButton executeMainAlgorithmButton = new JButton("Execute Main Algorithm");
         executeMainAlgorithmButton.addActionListener(e -> {
-            if (algorithmService.mainAlgorithm(this.graph, this.maxCentersValue, this.maxClientsPerCentersValue, 2, false)) {
-                drawGraph(this.graph);
-            } else {
-                System.out.println("NOT SOLVABLE");
-            }
+            executeMainAlgorithm();
         });
 
         ChangeListener optionsChangeListener = e -> {
@@ -137,7 +136,77 @@ public class Window {
         this.frame.setVisible(true);
     }
 
-    public void drawGraph(Graph<Vertex, DefaultWeightedEdge> graph) {
+    private void executeMainAlgorithm() {
+
+        Result result = this.algorithmService.mainAlgorithm(
+                this.graph,
+                this.maxCentersValue,
+                this.maxClientsPerCentersValue,
+                2,
+                false);
+
+        System.out.println("\nSTART DRAWING RESULT\n");
+        if (result != null) {
+            drawSubGraphs(result);
+        } else {
+            System.out.println("NOT SOLVABLE");
+        }
+    }
+
+    private void drawSubGraphs(Result result) {
+        ActionListener drawSubGraphsListener = new ActionListener() {
+            int subGraphIndex = 0;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Timer sourceTimer = (Timer) e.getSource();
+                if (subGraphIndex == result.getSubGraphsOfOriginalGraphByWeightInMain().size()) {
+                    System.out.println("\tDrawing result");
+                    drawGraph(result.getResult());
+                    System.out.println("\nEND DRAWING RESULT\n");
+                    sourceTimer.stop();
+                } else {
+                    Graph<Vertex, DefaultWeightedEdge> subGraph = result.getSubGraphsOfOriginalGraphByWeightInMain().get(subGraphIndex);
+                    double weight = subGraph.edgeSet().stream().mapToDouble(subGraph::getEdgeWeight).max().orElse(0);
+                    System.out.println("\tDrawing subGraph with edge weights up to " + weight);
+                    drawGraph(subGraph);
+                    //TODO: find a way to draw subGraphs of subGraphs and delay timers inside timers, something like in the commented section
+//
+//                    Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponents = result.getConnectedComponentsOfSubGraphsInAssignCenters().get(subGraphIndex);
+//                    int delay = connectedComponents.size() * timerDelay;
+//                    sourceTimer.setDelay(delay);
+//                    drawConnectedComponents(result, connectedComponents);
+                    ++subGraphIndex;
+                }
+            }
+        };
+        Timer drawSubGraphsTimer = new Timer(timerDelay, drawSubGraphsListener);
+        drawSubGraphsTimer.setInitialDelay(0);
+        drawSubGraphsTimer.start();
+    }
+
+//    private void drawConnectedComponents(Result result, Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponents) {
+//        ActionListener drawConnectedComponentsListener = new ActionListener() {
+//            List<Graph<Vertex, DefaultWeightedEdge>> connectedComponentList = new ArrayList<>(connectedComponents);
+//            int connectedComponentIndex = 0;
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                Timer sourceTimer = (Timer) e.getSource();
+//                if(connectedComponentIndex == connectedComponents.size()){
+//                    sourceTimer.stop();
+//                } else {
+//                    Graph<Vertex, DefaultWeightedEdge> connectedComponent = connectedComponentList.get(connectedComponentIndex);
+//                    System.out.println("\t\tDrawing connected component of subGraph");
+//                    drawGraph(connectedComponent);
+//                    ++connectedComponentIndex;
+//                }
+//            }
+//        };
+//        Timer drawConnectedComponentsTimer = new Timer(timerDelay, drawConnectedComponentsListener);
+//        drawConnectedComponentsTimer.start();
+//    }
+
+    private void drawGraph(Graph<Vertex, DefaultWeightedEdge> graph) {
         this.frame.remove(graphPainter);
         this.frame.validate();
         this.frame.repaint();

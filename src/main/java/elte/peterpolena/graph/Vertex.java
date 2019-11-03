@@ -42,6 +42,18 @@ vertex.getCenter() = ctr(v)
         this.isMonarch = false;
     }
 
+    public Vertex(Vertex vertex) {
+        this.x = vertex.getX();
+        this.y = vertex.getY();
+        this.color = vertex.getColor();
+        this.empire = new ArrayList<>();
+        this.children = new ArrayList<>();
+        this.minors = new ArrayList<>();
+        this.clients = new HashSet<>();
+        this.isMarked = vertex.isMarked;
+        this.isMonarch = vertex.isMonarch;
+    }
+
     public int getX() {
         return x;
     }
