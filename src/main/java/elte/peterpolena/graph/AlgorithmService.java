@@ -219,6 +219,57 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             from.setClients(to);
             from.getClients().forEach(client -> client.setCenter(from));
         });
+
+        //for displaying purposes, the graph we constructed was:
+        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
+        subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
+        //copy monarch set into bipartite graph
+        //Set<Vertex> monarchs = new HashSet<>();
+        Map<Vertex, Vertex> monarchCopies = new HashMap<>();
+        m.forEach(x -> {
+            int diffPlacement = -50;
+            if(x.getX() > (maxXCoordinate - minXCoordinate))
+                diffPlacement += 50;
+            monarchCopies.put(x, new Vertex(x.getX() + diffPlacement , x.getY(), GREEN));
+        });
+        monarchCopies.values().forEach(bipartiteGraph::addVertex);
+        //E'
+        monarchCopies.forEach((original, monarch) -> Utils.getAdjacentVerticesUpToDistance(subGraph, original.getMajor(), 2)
+                .forEach(adjacentVertex -> {
+                    //if (!monarch.equals(adjacentVertex)) {
+                    bipartiteGraph.addEdge(monarch, adjacentVertex);
+                    //}
+                }));
+
+        //add s and t
+        Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
+        Vertex target = new Vertex(maxXCoordinate - 10, maxYCoordinate - 10, BLUE);
+        bipartiteGraph.addVertex(source);
+        bipartiteGraph.addVertex(target);
+
+        //for m ∈ M add edge (s, m) and set (s, m) capacity to L
+        monarchCopies.values().forEach(monarch -> {
+            bipartiteGraph.addEdge(source, monarch);
+            bipartiteGraph.getEdge(source, monarch).setCapacity(maxClientsPerCenter);
+        });
+
+        //for v ∈ V add edge (v, t) and set (s, m) capacity to 1
+        subGraph.vertexSet().forEach(vertex -> {
+            bipartiteGraph.addEdge(vertex, target);
+            bipartiteGraph.getEdge(vertex, target).setCapacity(1);
+        });
+
+        //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
+        monarchCopies.forEach((orig, monarch) -> subGraph.vertexSet()
+                .forEach(vertex -> {
+                    if (bipartiteGraph.getEdge(monarch, vertex) != null) {
+                        bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
+                        if (orig.equals(vertex)) {
+                            bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
+                        }
+                    }
+                }));
+
         //Construct directed bipartite graph
         /*Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
         subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
