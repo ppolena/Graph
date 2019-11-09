@@ -50,8 +50,8 @@ vertex.getCenter() = ctr(v)
         this.children = new ArrayList<>();
         this.minors = new ArrayList<>();
         this.clients = new HashSet<>();
-        this.isMarked = vertex.isMarked;
-        this.isMonarch = vertex.isMonarch;
+        this.isMarked = false;
+        this.isMonarch = false;
     }
 
     public int getX() {
@@ -195,12 +195,11 @@ vertex.getCenter() = ctr(v)
         if (o == null || getClass() != o.getClass()) return false;
         Vertex vertex = (Vertex) o;
         return x == vertex.x &&
-                y == vertex.y &&
-                color.equals(vertex.color);
+                y == vertex.y;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(x, y, color);
+        return Objects.hash(x, y);
     }
 }

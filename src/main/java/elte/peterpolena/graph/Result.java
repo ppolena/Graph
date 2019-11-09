@@ -75,21 +75,17 @@ public class Result {
         });
     }
 
-    public void setSubGraphsOfOriginalGraphByWeight(List<Graph<Vertex, DefaultWeightedEdge>> subGraphsOfOriginalGraphByWeight) {
-        List<Graph<Vertex, DefaultWeightedEdge>> subGraphsOfOriginalGraphByWeightCopy = new ArrayList<>();
-        subGraphsOfOriginalGraphByWeight.forEach(subGraph -> {
-            Graph<Vertex, DefaultWeightedEdge> subGraphCopy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-            subGraph.edgeSet().forEach(edge -> {
-                Vertex source = new Vertex(subGraph.getEdgeSource(edge));
-                Vertex target = new Vertex(subGraph.getEdgeTarget(edge));
-                subGraphCopy.addVertex(source);
-                subGraphCopy.addVertex(target);
-                subGraphCopy.addEdge(source, target);
-                subGraphCopy.setEdgeWeight(source, target, subGraph.getEdgeWeight(edge));
-            });
-            subGraphsOfOriginalGraphByWeightCopy.add(subGraphCopy);
+    public void addSubGraphOfOriginalGraphByWeight(Graph<Vertex, DefaultWeightedEdge> subGraphOfOriginalGraphByWeight) {
+        Graph<Vertex, DefaultWeightedEdge> subGraphCopy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        subGraphOfOriginalGraphByWeight.edgeSet().forEach(edge -> {
+            Vertex source = new Vertex(subGraphOfOriginalGraphByWeight.getEdgeSource(edge));
+            Vertex target = new Vertex(subGraphOfOriginalGraphByWeight.getEdgeTarget(edge));
+            subGraphCopy.addVertex(source);
+            subGraphCopy.addVertex(target);
+            subGraphCopy.addEdge(source, target);
+            subGraphCopy.setEdgeWeight(source, target, subGraphOfOriginalGraphByWeight.getEdgeWeight(edge));
         });
-        this.subGraphsOfOriginalGraphByWeightInMain.addAll(subGraphsOfOriginalGraphByWeightCopy);
+        this.subGraphsOfOriginalGraphByWeightInMain.add(subGraphCopy);
     }
 
     public void addConnectedComponentsOfSubGraph(Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponentsOfSubGraph) {
@@ -150,4 +146,15 @@ public class Result {
             this.result.setEdgeWeight(source, target, result.getEdgeWeight(edge));
         });
     }
+
+//    public void reset(){
+//        this.originalGraphInMain = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+//        this.subGraphsOfOriginalGraphByWeightInMain.clear();
+//        this.connectedComponentsOfSubGraphsInAssignCenters.clear();
+//        this.majorMonarchsInSelectMonarchs.clear();
+//        this.minorMonarchsInSelectMonarchs.clear();
+//        this.monarchsInSelectMonarchs.clear();
+//        this.bipartiteGraphsFromMonarchsAndSubGraphsInAssignDomains.clear();
+//        this.result = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+//    }
 }

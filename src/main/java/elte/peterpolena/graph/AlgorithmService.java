@@ -6,7 +6,6 @@ import org.jgrapht.alg.util.Pair;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
-import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +40,6 @@ import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
 import static org.apache.commons.collections4.ListUtils.partition;
 
-@Service
 public class AlgorithmService {
 
 /*
@@ -84,6 +82,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                 .sorted()
                 .collect(toList());
 
+        System.out.println("\tWeights: " + weights.size());
+
         List<Graph<Vertex, DefaultWeightedEdge>> subGraphs = new ArrayList<>();
         weights.forEach(weight -> {
             Graph<Vertex, DefaultWeightedEdge> subGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
@@ -92,10 +92,10 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             subGraphs.add(subGraph);
         });
 
-        result.setSubGraphsOfOriginalGraphByWeight(subGraphs);
         System.out.println("\tSubGraphs: " + subGraphs.size());
 
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
+            result.addSubGraphOfOriginalGraphByWeight(subGraph);
             if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
                 result.setResult(graph);
                 System.out.println("\nEND MAIN ALGORITHM\n");
@@ -284,11 +284,11 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         });
 
         //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
-        monarchCopies.forEach((orig, monarch) -> subGraph.vertexSet()
+        monarchCopies.forEach((original, monarch) -> subGraph.vertexSet()
                 .forEach(vertex -> {
                     if (bipartiteGraph.getEdge(monarch, vertex) != null) {
                         bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
-                        if (orig.equals(vertex)) {
+                        if (original.equals(vertex)) {
                             bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
                         }
                     }

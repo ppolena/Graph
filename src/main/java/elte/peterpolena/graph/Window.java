@@ -1,8 +1,8 @@
 package elte.peterpolena.graph;
 
 import org.jgrapht.Graph;
-import org.jgrapht.graph.DefaultUndirectedWeightedGraph;
 import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
 import javax.swing.*;
@@ -21,6 +21,7 @@ import static elte.peterpolena.graph.Config.sliderMinValue;
 import static elte.peterpolena.graph.Config.sliderPanelHeight;
 import static elte.peterpolena.graph.Config.sliderPanelWidth;
 import static elte.peterpolena.graph.Config.timerDelay;
+import static elte.peterpolena.graph.Utils.copy;
 import static java.awt.event.ItemEvent.SELECTED;
 
 @Service
@@ -33,17 +34,15 @@ public class Window {
     private boolean showEdgeWeight = true;
     private int maxCentersValue;
     private int maxClientsPerCentersValue;
-    private AlgorithmService algorithmService;
 
     public Window(){
 
-        this.algorithmService = new AlgorithmService();
         this.frame = new JFrame("Graph");
         this.frame.setSize(frameWidth, frameHeight);
         this.frame.setLocationRelativeTo(null);
         this.frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        this.graph = new DefaultUndirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        this.graph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
         this.graphPainter = new GraphPainter(graph, showEdgeWeight);
 
         this.maxCentersValue = 1;
@@ -72,8 +71,8 @@ public class Window {
         JCheckBox randomizedPlacementCheckBox = new JCheckBox("Randomized placement", randomizedPlacement);
         randomizedPlacementCheckBox.addItemListener(e -> {
             randomizedPlacement = e.getStateChange() == SELECTED;
-            this.graph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
-            drawGraph(this.graph);
+            Graph<Vertex, DefaultWeightedEdge> generatedGraph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
+            drawGraph(generatedGraph);
         });
 
         JCheckBox showEdgeWeightCheckbox = new JCheckBox("Show edge weight", showEdgeWeight);
@@ -84,8 +83,8 @@ public class Window {
 
         JButton reloadButton = new JButton("Reload");
         reloadButton.addActionListener(e -> {
-            this.graph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
-            drawGraph(this.graph);
+            Graph<Vertex, DefaultWeightedEdge> generateGraph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
+            drawGraph(generateGraph);
         });
 
         JSpinner maxCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
@@ -99,15 +98,13 @@ public class Window {
         JLabel maxClientsPerCenterLabel = new JLabel("Max Clients Per Centers (L)");
 
         JButton executeMainAlgorithmButton = new JButton("Execute Main Algorithm");
-        executeMainAlgorithmButton.addActionListener(e -> {
-            executeMainAlgorithm();
-        });
+        executeMainAlgorithmButton.addActionListener(e -> executeMainAlgorithm());
 
         ChangeListener optionsChangeListener = e -> {
             JSlider slider = (JSlider) e.getSource();
             if (!slider.getValueIsAdjusting()) {
-                this.graph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
-                drawGraph(this.graph);
+                Graph<Vertex, DefaultWeightedEdge> generateGraph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
+                drawGraph(generateGraph);
             }
         };
 //        centerSlider.addChangeListener(optionsChangeListener);
@@ -138,7 +135,9 @@ public class Window {
 
     private void executeMainAlgorithm() {
 
-        Result result = this.algorithmService.mainAlgorithm(
+        this.drawGraph(this.graph);
+
+        Result result = new AlgorithmService().mainAlgorithm(
                 this.graph,
                 this.maxCentersValue,
                 this.maxClientsPerCentersValue,
@@ -147,6 +146,7 @@ public class Window {
 
         System.out.println("\nSTART DRAWING RESULT\n");
         if (result != null) {
+            System.out.println(result.getSubGraphsOfOriginalGraphByWeightInMain().size());
             drawSubGraphs(result);
         } else {
             System.out.println("NOT SOLVABLE");
@@ -163,8 +163,11 @@ public class Window {
                 if (subGraphIndex == result.getSubGraphsOfOriginalGraphByWeightInMain().size()) {
                     System.out.println("\tDrawing result");
                     drawGraph(result.getResult());
+                    long centers = result.getResult().vertexSet().stream().filter(vertex -> vertex.getColor().equals(Color.RED)).count();
+                    System.out.println("\tCenters: " + centers);
                     System.out.println("\nEND DRAWING RESULT\n");
                     sourceTimer.stop();
+                    resetToOriginal(result.getOriginalGraphInMain());
                 } else {
                     Graph<Vertex, DefaultWeightedEdge> subGraph = result.getSubGraphsOfOriginalGraphByWeightInMain().get(subGraphIndex);
                     double weight = subGraph.edgeSet().stream().mapToDouble(subGraph::getEdgeWeight).max().orElse(0);
@@ -211,11 +214,15 @@ public class Window {
         this.frame.validate();
         this.frame.repaint();
 
-        this.graph = graph;
-        this.graphPainter = new GraphPainter(graph, showEdgeWeight);
+        this.graph = copy(graph);
+        this.graphPainter = new GraphPainter(this.graph, showEdgeWeight);
 
         this.frame.add(graphPainter, BorderLayout.CENTER);
         this.frame.validate();
         this.frame.repaint();
+    }
+
+    private void resetToOriginal(Graph<Vertex, DefaultWeightedEdge> graph) {
+        this.graph = copy(graph);
     }
 }

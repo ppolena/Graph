@@ -20,7 +20,7 @@ import static java.util.stream.Collectors.toSet;
 
 public class Utils {
 
-    static public Graph<Vertex, DefaultWeightedEdge> getSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> vertices) {
+    public static Graph<Vertex, DefaultWeightedEdge> getSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> vertices) {
         Graph<Vertex, DefaultWeightedEdge> subGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
         vertices.forEach(subGraph::addVertex);
         List<Vertex> vertexList = new ArrayList<>(vertices);
@@ -36,7 +36,7 @@ public class Utils {
         return subGraph;
     }
 
-    static public void addEdgesUpToMaxWeightToSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Graph<Vertex, DefaultWeightedEdge> subGraph, double maxWeight) {
+    public static void addEdgesUpToMaxWeightToSubGraph(Graph<Vertex, DefaultWeightedEdge> graph, Graph<Vertex, DefaultWeightedEdge> subGraph, double maxWeight) {
         graph.edgeSet()
                 .stream()
                 .filter(edgeToFilter -> graph.getEdgeWeight(edgeToFilter) <= maxWeight)
@@ -48,7 +48,7 @@ public class Utils {
                                 edgeToAdd));
     }
 
-    static public Comparator<DefaultWeightedEdge> getDefaultWeightedEdgeComparator(Graph<Vertex, DefaultWeightedEdge> graph) {
+    public static Comparator<DefaultWeightedEdge> getDefaultWeightedEdgeComparator(Graph<Vertex, DefaultWeightedEdge> graph) {
         return (DefaultWeightedEdge edge1, DefaultWeightedEdge edge2) -> {
             if (graph.getEdgeWeight(edge1) < graph.getEdgeWeight(edge2)) {
                 return -1;
@@ -60,14 +60,14 @@ public class Utils {
         };
     }
 
-    static public List<Integer> getComponentNodeCount(List<Set<Vertex>> connectedComponents) {
+    public static List<Integer> getComponentNodeCount(List<Set<Vertex>> connectedComponents) {
         return connectedComponents
                 .stream()
                 .map(Set::size)
                 .collect(toList());
     }
 
-    static public List<Integer> getRequiredCentersPerComponent(int maxClientsPerCenter, List<Integer> componentNodeCount) {
+    public static List<Integer> getRequiredCentersPerComponent(int maxClientsPerCenter, List<Integer> componentNodeCount) {
         return componentNodeCount
                 .stream()
                 .map(cnc ->
@@ -75,7 +75,7 @@ public class Utils {
                 .collect(toList());
     }
 
-    static public int getRequiredCenters(List<Integer> requiredCentersPerComponent) {
+    public static int getRequiredCenters(List<Integer> requiredCentersPerComponent) {
         int requiredCenters = 0;
         for (int requiredCenterForComponent : requiredCentersPerComponent) {
             requiredCenters += requiredCenterForComponent;
@@ -83,11 +83,11 @@ public class Utils {
         return requiredCenters;
     }
 
-    static public int getEdgeCapacity(Graph<Vertex, WeightedEdgeWithCapacity> graph, WeightedEdgeWithCapacity edge) {
+    public static int getEdgeCapacity(Graph<Vertex, WeightedEdgeWithCapacity> graph, WeightedEdgeWithCapacity edge) {
         return graph.getEdge(graph.getEdgeSource(edge), graph.getEdgeTarget(edge)).getCapacity();
     }
 
-    static public int getVertexSupply(Vertex source, Vertex target, Vertex vertex) {
+    public static int getVertexSupply(Vertex source, Vertex target, Vertex vertex) {
         if (vertex.equals(source)) {
             return 1;
         } else if (vertex.equals(target)) {
@@ -97,7 +97,7 @@ public class Utils {
         }
     }
 
-    static public Set<Vertex> getClients(Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph, Map<WeightedEdgeWithCapacity, Double> flowMap, Vertex monarch) {
+    public static Set<Vertex> getClients(Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph, Map<WeightedEdgeWithCapacity, Double> flowMap, Vertex monarch) {
         return flowMap
                 .keySet()
                 .stream()
@@ -110,14 +110,14 @@ public class Utils {
                 .collect(toSet());
     }
 
-    static public List<Vertex> getFreeNodes(List<Vertex> vertices) {
+    public static List<Vertex> getFreeNodes(List<Vertex> vertices) {
         return vertices
                 .stream()
                 .filter(node -> node.getColor().equals(BLACK))
                 .collect(toList());
     }
 
-    static public List<Vertex> getTreePathTo(Vertex from, Vertex to) {
+    public static List<Vertex> getTreePathTo(Vertex from, Vertex to) {
         List<Vertex> ret = new ArrayList<>();
         if (from == to) {
             ret.add(from);
@@ -155,7 +155,7 @@ public class Utils {
         return ret;
     }
 
-    static public List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
+    public static List<Vertex> getAdjacentVerticesUpToDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
         List<Vertex> adjacentVertices = Graphs.neighborListOf(graph, source);
         Set<Vertex> vertices = new HashSet<>(adjacentVertices);
         vertices.add(source);
@@ -167,7 +167,7 @@ public class Utils {
         return new ArrayList<>(vertices);
     }
 
-    static public List<Vertex> getAdjacentVerticesAtDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
+    public static List<Vertex> getAdjacentVerticesAtDistance(Graph<Vertex, DefaultWeightedEdge> graph, Vertex source, int distance) {
         Set<Vertex> vertices = new HashSet<>();
         vertices.addAll(getAdjacentVerticesUpToDistance(graph, source, distance));
         if(distance > 1)
@@ -176,7 +176,7 @@ public class Utils {
         return new ArrayList<>(vertices);
     }
 
-    static public List<Vertex> shuffleAndReduceToSize(List<Vertex> vertices, int size) {
+    public static List<Vertex> shuffleAndReduceToSize(List<Vertex> vertices, int size) {
         List<Vertex> list = new ArrayList<>(vertices);
         Collections.shuffle(list);
         if (size > list.size()) {
@@ -186,15 +186,29 @@ public class Utils {
         }
         return list.subList(0, size);
     }
-    static public  boolean hasUnmarkedNodesFurther(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> fromSet, int distance) {
+
+    public static boolean hasUnmarkedNodesFurther(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> fromSet, int distance) {
         return true; //TODO implement
     }
 
-    static public  Vertex getRandomVertexFromDistance(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> distanceFrom, List<Vertex> fromList, int distance) {
+    public static Vertex getRandomVertexFromDistance(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> distanceFrom, List<Vertex> fromList, int distance) {
         return new Vertex(0, 0, BLUE); //TODO implement
     }
 
-    static public  Vertex getALeaf(Set<Vertex> tree) {
+    public static Vertex getALeaf(Set<Vertex> tree) {
         return tree.stream().filter(x -> tree.stream().noneMatch(y -> y.getParent() == x)).findAny().get();
+    }
+
+    public static Graph<Vertex, DefaultWeightedEdge> copy(Graph<Vertex, DefaultWeightedEdge> graph) {
+        Graph<Vertex, DefaultWeightedEdge> copy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        graph.edgeSet().forEach(edge -> {
+            Vertex source = new Vertex(graph.getEdgeSource(edge));
+            Vertex target = new Vertex(graph.getEdgeTarget(edge));
+            copy.addVertex(source);
+            copy.addVertex(target);
+            copy.addEdge(source, target);
+            copy.setEdgeWeight(source, target, graph.getEdgeWeight(edge));
+        });
+        return copy;
     }
 }
