@@ -146,7 +146,6 @@ public class Window {
 
         System.out.println("\nSTART DRAWING RESULT\n");
         if (result != null) {
-            System.out.println(result.getSubGraphsOfOriginalGraphByWeightInMain().size());
             drawSubGraphs(result);
         } else {
             System.out.println("NOT SOLVABLE");
