@@ -6,8 +6,8 @@ import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,7 +24,7 @@ public class Result {
 
     public Result() {
 		this.originalGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-		this.subGraphsAndConnectedComponents = new HashMap<>();
+        this.subGraphsAndConnectedComponents = new LinkedHashMap<>();
 		this.majorMonarchs = new ArrayList<>();
 		this.minorMonarchs = new ArrayList<>();
 		this.monarchs = new ArrayList<>();

@@ -162,13 +162,12 @@ public class Window {
 
 		Map<Graph<Vertex, DefaultWeightedEdge>, Set<Graph<Vertex, DefaultWeightedEdge>>> subGraphsAndConnectedComponents = result.getSubGraphsAndConnectedComponents();
 		List<Graph<Vertex, DefaultWeightedEdge>> graphsToDraw = new ArrayList<>();
-		subGraphsAndConnectedComponents.keySet().forEach(key -> {
-			if (!key.vertexSet().isEmpty() && !key.edgeSet().isEmpty()) {
-				graphsToDraw.add(key);
+        subGraphsAndConnectedComponents.forEach((subGraph, connectedComponents) -> {
+            if (!subGraph.vertexSet().isEmpty() && !subGraph.edgeSet().isEmpty()) {
+                graphsToDraw.add(subGraph);
 			}
-			graphsToDraw.addAll(subGraphsAndConnectedComponents
-					.get(key)
-					.stream()
+            graphsToDraw.addAll(connectedComponents
+                    .stream()
 					.filter(graph ->
 							!graph.vertexSet().isEmpty() &&
 									!graph.edgeSet().isEmpty())
