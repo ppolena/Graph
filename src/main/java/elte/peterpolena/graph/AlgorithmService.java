@@ -23,6 +23,7 @@ import static elte.peterpolena.graph.Utils.addEdgesUpToMaxWeightToSubGraph;
 import static elte.peterpolena.graph.Utils.getALeaf;
 import static elte.peterpolena.graph.Utils.getAdjacentVerticesAtDistance;
 import static elte.peterpolena.graph.Utils.getAdjacentVerticesUpToDistance;
+import static elte.peterpolena.graph.Utils.getCentersCount;
 import static elte.peterpolena.graph.Utils.getComponentNodeCount;
 import static elte.peterpolena.graph.Utils.getFreeNodes;
 import static elte.peterpolena.graph.Utils.getRandomVertexFromDistance;
@@ -95,7 +96,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("\tSubGraphs: " + subGraphs.size());
 
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
-            result.addSubGraphOfOriginalGraphByWeight(subGraph);
+			//result.addSubGraphOfOriginalGraphByWeight(subGraph);
             if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
                 result.setResult(graph);
                 System.out.println("\nEND MAIN ALGORITHM\n");
@@ -106,16 +107,16 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         return null;
     }
 
-    private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
-                                           int maxCenters,
-                                           int maxClientsPerCenter,
-                                           int maxFailedCenters,
-                                           boolean isConservative) {
+	private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph,
+										   int maxCenters,
+										   int maxClientsPerCenter,
+										   int maxFailedCenters,
+										   boolean isConservative) {
 
         System.out.println("\nSTART ASSIGN CENTERS ALGORITHM\n");
 
-        graph.vertexSet().forEach(Vertex::clearData);
-        ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
+		subGraph.vertexSet().forEach(Vertex::clearData);
+		ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(subGraph);
 
         List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
 
@@ -126,27 +127,27 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         int requiredCenters = getRequiredCenters(requiredCentersPerComponent);
 
         System.out.println("\tKw: " + requiredCenters);
-
+		System.out.println("\tKw > K: " + (requiredCenters > maxCenters));
         if (requiredCenters > maxCenters) {
             return false;
         }
 
-        Set<Graph<Vertex, DefaultWeightedEdge>> subGraphs =
+		Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponentSet =
                 connectedComponents
                         .stream()
-                        .map(vertices -> getSubGraph(graph, vertices))
+						.map(vertices -> getSubGraph(subGraph, vertices))
                         .collect(toSet());
 
-        result.addConnectedComponentsOfSubGraph(subGraphs);
-        System.out.println("\tSubGraph connected components: " + subGraphs.size());
+		result.addConnectedComponentsOfSubGraph(subGraph, connectedComponentSet);
+		System.out.println("\tSubGraph connected components: " + connectedComponentSet.size());
 
         if (isConservative) {
-            subGraphs.forEach(x -> callConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
+			connectedComponentSet.forEach(cc -> callConservativeAlgorithms(cc, maxCenters, maxClientsPerCenter, maxFailedCenters));
         } else {
-            subGraphs.forEach(x -> callNonConservativeAlgorithms(x, maxClientsPerCenter, maxFailedCenters));
+			connectedComponentSet.forEach(cc -> callNonConservativeAlgorithms(cc, maxClientsPerCenter, maxFailedCenters));
         }
 
-        long centers = graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
+		long centers = getCentersCount(subGraph);
 
         boolean centersBelowOrEqualToMaxCenters = centers <= maxCenters;
 
@@ -157,17 +158,20 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         return centersBelowOrEqualToMaxCenters;
     }
 
-    private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
-                                               int maxClientsPerCenter,
-                                               int maxFailedCenters) {
+	private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> connectedComponent,
+											   int maxClientsPerCenter,
+											   int maxFailedCenters) {
 
+		System.out.println("\n---ITERATION START---\n");
         m1.clear();
         m2.clear();
         m.clear();
-        nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
-        nonConservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
-        nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter, maxFailedCenters);
+		nonConservativeSelectMonarchsAlgorithm(connectedComponent, maxFailedCenters);
+		nonConservativeAssignDomainsAlgorithm(connectedComponent, maxClientsPerCenter);
+		nonConservativeReAssignAlgorithm(connectedComponent, maxClientsPerCenter, maxFailedCenters);
         //nonConservativeReAssignByFailedAlgorithm(subGraph);
+		System.out.println("\tNumber of centers in connected component at the end of iteration: " + getCentersCount(connectedComponent));
+		System.out.println("\n---ITERATION END---\n");
     }
 
     private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
@@ -457,7 +461,7 @@ free node => node.getColor().equals(BLACK)
         }
 
         //M' = all centers allocated so far
-        long centers = subGraph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
+		long centers = getCentersCount(subGraph);
 
         //ceil(n/L) + α
         long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
@@ -469,12 +473,16 @@ free node => node.getColor().equals(BLACK)
             int centersNeeded = (int) (requiredCenters - centers);
             List<Vertex> freeNodes = getFreeNodes(new ArrayList<>(subGraph.vertexSet()));
             shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
+			long centersAfterRandomAssign = getCentersCount(subGraph);
+			System.out.println("\tNumber of free nodes to choose from: " + freeNodes.size());
+			System.out.println("\tCenters after random assign: " + centersAfterRandomAssign);
         }
 
         System.out.println("\nEND REASSIGN ALGORITHM\n");
     }
 
-    private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
+
+	private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
         //TODO we need that subgraph when the original algorithm was successful
         Map<Pair<Vertex, Vertex>, Vertex> X = new HashMap<>();
 

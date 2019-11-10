@@ -15,6 +15,7 @@ import java.util.Set;
 
 import static java.awt.Color.BLACK;
 import static java.awt.Color.BLUE;
+import static java.awt.Color.RED;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
@@ -211,4 +212,8 @@ public class Utils {
         });
         return copy;
     }
+
+	public static long getCentersCount(Graph<Vertex, DefaultWeightedEdge> graph) {
+		return graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
+	}
 }

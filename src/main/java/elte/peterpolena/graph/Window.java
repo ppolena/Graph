@@ -10,6 +10,10 @@ import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static elte.peterpolena.graph.Config.clientsSliderStartValue;
 import static elte.peterpolena.graph.Config.frameHeight;
@@ -22,7 +26,9 @@ import static elte.peterpolena.graph.Config.sliderPanelHeight;
 import static elte.peterpolena.graph.Config.sliderPanelWidth;
 import static elte.peterpolena.graph.Config.timerDelay;
 import static elte.peterpolena.graph.Utils.copy;
+import static elte.peterpolena.graph.Utils.getCentersCount;
 import static java.awt.event.ItemEvent.SELECTED;
+import static java.util.stream.Collectors.toList;
 
 @Service
 public class Window {
@@ -153,32 +159,50 @@ public class Window {
     }
 
     private void drawSubGraphs(Result result) {
+
+		Map<Graph<Vertex, DefaultWeightedEdge>, Set<Graph<Vertex, DefaultWeightedEdge>>> subGraphsAndConnectedComponents = result.getSubGraphsAndConnectedComponents();
+		List<Graph<Vertex, DefaultWeightedEdge>> graphsToDraw = new ArrayList<>();
+		subGraphsAndConnectedComponents.keySet().forEach(key -> {
+			if (!key.vertexSet().isEmpty() && !key.edgeSet().isEmpty()) {
+				graphsToDraw.add(key);
+			}
+			graphsToDraw.addAll(subGraphsAndConnectedComponents
+					.get(key)
+					.stream()
+					.filter(graph ->
+							!graph.vertexSet().isEmpty() &&
+									!graph.edgeSet().isEmpty())
+					.collect(toList()));
+		});
+
         ActionListener drawSubGraphsListener = new ActionListener() {
-            int subGraphIndex = 0;
+			int graphIndex = 0;
 
             @Override
             public void actionPerformed(ActionEvent e) {
                 Timer sourceTimer = (Timer) e.getSource();
-                if (subGraphIndex == result.getSubGraphsOfOriginalGraphByWeightInMain().size()) {
+				if (graphIndex == graphsToDraw.size()) {
                     System.out.println("\tDrawing result");
                     drawGraph(result.getResult());
-                    long centers = result.getResult().vertexSet().stream().filter(vertex -> vertex.getColor().equals(Color.RED)).count();
-                    System.out.println("\tCenters: " + centers);
+					System.out.println("\tCenters drawn: " + getCentersCount(result.getResult()));
                     System.out.println("\nEND DRAWING RESULT\n");
                     sourceTimer.stop();
-                    resetToOriginal(result.getOriginalGraphInMain());
+					resetToOriginal(result.getOriginalGraph());
                 } else {
-                    Graph<Vertex, DefaultWeightedEdge> subGraph = result.getSubGraphsOfOriginalGraphByWeightInMain().get(subGraphIndex);
-                    double weight = subGraph.edgeSet().stream().mapToDouble(subGraph::getEdgeWeight).max().orElse(0);
-                    System.out.println("\tDrawing subGraph with edge weights up to " + weight);
-                    drawGraph(subGraph);
+					Graph<Vertex, DefaultWeightedEdge> graph = graphsToDraw.get(graphIndex);
+//                    double weight = subGraph.edgeSet().stream().mapToDouble(subGraph::getEdgeWeight).max().orElse(0);
+//                    System.out.println("\tDrawing subGraph with edge weights up to " + weight);
+					int vertexCount = graph.vertexSet().size();
+					int edgeCount = graph.edgeSet().size();
+					System.out.println("\t(" + graphsToDraw.size() + "/" + (graphIndex + 1) + ") Drawing graph with " + vertexCount + " vertices and " + edgeCount + " edges...");
+					drawGraph(graph);
                     //TODO: find a way to draw subGraphs of subGraphs and delay timers inside timers, something like in the commented section
 //
-//                    Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponents = result.getConnectedComponentsOfSubGraphsInAssignCenters().get(subGraphIndex);
+//                    Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponents = result.getConnectedComponentsOfSubGraphsInAssignCenters().get(graphIndex);
 //                    int delay = connectedComponents.size() * timerDelay;
 //                    sourceTimer.setDelay(delay);
 //                    drawConnectedComponents(result, connectedComponents);
-                    ++subGraphIndex;
+					++graphIndex;
                 }
             }
         };
