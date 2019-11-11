@@ -5,13 +5,7 @@ import org.jgrapht.Graphs;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static java.awt.Color.BLACK;
 import static java.awt.Color.BLUE;
@@ -210,5 +204,19 @@ public class Utils {
             copy.setEdgeWeight(source, target, graph.getEdgeWeight(edge));
         });
         return copy;
+    }
+
+    public static int levelOfNode(Vertex node) {
+        int ret = 0;
+        Vertex iter = node;
+        while (iter.getParent() != null) {
+            ret++;
+            iter = iter.getParent();
+        }
+        return ret;
+    }
+
+    public static Set<Vertex> nodesAtLevel(Set<Vertex> tree, int neededLevel) {
+        return tree.stream().filter(x -> levelOfNode(x) == neededLevel).collect(toSet());
     }
 }
