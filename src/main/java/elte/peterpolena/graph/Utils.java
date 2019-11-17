@@ -220,4 +220,18 @@ public class Utils {
 	public static long getCentersCount(Graph<Vertex, DefaultWeightedEdge> graph) {
 		return graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
 	}
+
+    public static int levelOfNode(Vertex node) {
+        int ret = 0;
+        Vertex iter = node;
+        while (iter.getParent() != null) {
+            ret++;
+            iter = iter.getParent();
+        }
+        return ret;
+    }
+
+    public static Set<Vertex> nodesAtLevel(Set<Vertex> tree, int neededLevel) {
+        return tree.stream().filter(x -> levelOfNode(x) == neededLevel).collect(toSet());
+    }
 }
