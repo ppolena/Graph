@@ -7,11 +7,36 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static elte.peterpolena.graph.Config.*;
-import static elte.peterpolena.graph.Utils.*;
-import static java.awt.Color.*;
+import static elte.peterpolena.graph.Config.maxXCoordinate;
+import static elte.peterpolena.graph.Config.maxYCoordinate;
+import static elte.peterpolena.graph.Config.minXCoordinate;
+import static elte.peterpolena.graph.Config.minYCoordinate;
+import static elte.peterpolena.graph.Config.vertexRadius;
+import static elte.peterpolena.graph.Utils.addEdgesUpToMaxWeightToSubGraph;
+import static elte.peterpolena.graph.Utils.getALeaf;
+import static elte.peterpolena.graph.Utils.getAdjacentVerticesAtDistance;
+import static elte.peterpolena.graph.Utils.getAdjacentVerticesUpToDistance;
+import static elte.peterpolena.graph.Utils.getCentersCount;
+import static elte.peterpolena.graph.Utils.getComponentNodeCount;
+import static elte.peterpolena.graph.Utils.getFreeNodes;
+import static elte.peterpolena.graph.Utils.getRandomVertexFromDistance;
+import static elte.peterpolena.graph.Utils.getRequiredCenters;
+import static elte.peterpolena.graph.Utils.getRequiredCentersPerComponent;
+import static elte.peterpolena.graph.Utils.getSubGraph;
+import static elte.peterpolena.graph.Utils.getTreePathTo;
+import static elte.peterpolena.graph.Utils.hasUnmarkedNodesFurther;
+import static elte.peterpolena.graph.Utils.shuffleAndReduceToSize;
+import static java.awt.Color.BLUE;
+import static java.awt.Color.CYAN;
+import static java.awt.Color.GREEN;
+import static java.awt.Color.RED;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
@@ -72,27 +97,28 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("\tSubGraphs: " + subGraphs.size());
 
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
-            result.addSubGraphOfOriginalGraphByWeight(subGraph);
+            result.addGraphToDraw("[MAIN] Subgraph", subGraph);
             if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
-                result.setResult(graph);
+                result.addGraphToDraw("[MAIN] Result", graph);
                 System.out.println("\nEND MAIN ALGORITHM\n");
                 return result;
             }
         }
+
         System.out.println("\nEND MAIN ALGORITHM\n");
         return null;
     }
 
-    private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
-                                           int maxCenters,
-                                           int maxClientsPerCenter,
-                                           int maxFailedCenters,
-                                           boolean isConservative) {
+	private boolean assignCentersAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph,
+										   int maxCenters,
+										   int maxClientsPerCenter,
+										   int maxFailedCenters,
+										   boolean isConservative) {
 
         System.out.println("\nSTART ASSIGN CENTERS ALGORITHM\n");
 
-        graph.vertexSet().forEach(Vertex::clearData);
-        ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(graph);
+		subGraph.vertexSet().forEach(Vertex::clearData);
+		ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(subGraph);
 
         List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
 
@@ -103,27 +129,32 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         int requiredCenters = getRequiredCenters(requiredCentersPerComponent);
 
         System.out.println("\tKw: " + requiredCenters);
-
+		System.out.println("\tKw > K: " + (requiredCenters > maxCenters));
         if (requiredCenters > maxCenters) {
             return false;
         }
 
-        Set<Graph<Vertex, DefaultWeightedEdge>> subGraphs =
+		Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponentSet =
                 connectedComponents
                         .stream()
-                        .map(vertices -> getSubGraph(graph, vertices))
+						.map(vertices -> getSubGraph(subGraph, vertices))
                         .collect(toSet());
 
-        result.addConnectedComponentsOfSubGraph(subGraphs);
-        System.out.println("\tSubGraph connected components: " + subGraphs.size());
+		System.out.println("\tSubGraph connected components: " + connectedComponentSet.size());
 
         if (isConservative) {
-            subGraphs.forEach(x -> callConservativeAlgorithms(x, maxCenters, maxClientsPerCenter, maxFailedCenters));
+            connectedComponentSet.forEach(cc -> {
+                result.addGraphToDraw("[ASSIGN CENTERS] Connected Component", cc);
+                callConservativeAlgorithms(cc, maxCenters, maxClientsPerCenter, maxFailedCenters);
+            });
         } else {
-            subGraphs.forEach(x -> callNonConservativeAlgorithms(x, maxClientsPerCenter, maxFailedCenters));
+            connectedComponentSet.forEach(cc -> {
+                result.addGraphToDraw("[ASSIGN CENTERS] Connected Component", cc);
+                callNonConservativeAlgorithms(cc, maxClientsPerCenter, maxFailedCenters);
+            });
         }
 
-        long centers = graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
+		long centers = getCentersCount(subGraph);
 
         boolean centersBelowOrEqualToMaxCenters = centers <= maxCenters;
 
@@ -134,17 +165,20 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         return centersBelowOrEqualToMaxCenters;
     }
 
-    private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
-                                               int maxClientsPerCenter,
-                                               int maxFailedCenters) {
+	private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> connectedComponent,
+											   int maxClientsPerCenter,
+											   int maxFailedCenters) {
 
+		System.out.println("\n---ITERATION START---\n");
         m1.clear();
         m2.clear();
         m.clear();
-        nonConservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
-        nonConservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
-        nonConservativeReAssignAlgorithm(subGraph, maxClientsPerCenter, maxFailedCenters);
+		nonConservativeSelectMonarchsAlgorithm(connectedComponent, maxFailedCenters);
+		nonConservativeAssignDomainsAlgorithm(connectedComponent, maxClientsPerCenter);
+		nonConservativeReAssignAlgorithm(connectedComponent, maxClientsPerCenter, maxFailedCenters);
         //nonConservativeReAssignByFailedAlgorithm(subGraph);
+		System.out.println("\tNumber of centers in connected component at the end of iteration: " + getCentersCount(connectedComponent));
+		System.out.println("\n---ITERATION END---\n");
     }
 
     private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
@@ -212,12 +246,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         m.addAll(m1);
         m.addAll(m2);
 
+        result.addGraphWithMonarchsToDraw("[SELECT MONARCHS] Connected Component", subGraph, m2, m1);
+
         System.out.println("\tM size: " + m.size());
-
-        result.addMajorMonarchs(m1);
-        result.addMinorMonarchs(m2);
-        result.addMonarchs(m);
-
         System.out.println("\nEND SELECT MONARCHS ALGORITHM\n");
     }
 
@@ -243,7 +274,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                 .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, adjacentVertex)));
 
         //add s and t
-        Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
+        Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, CYAN);
         Vertex target = new Vertex(maxXCoordinate - 10, maxYCoordinate - 10, BLUE);
         bipartiteGraph.addVertex(source);
         bipartiteGraph.addVertex(target);
@@ -271,7 +302,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
                     }
                 }));
 
-        result.addBipartiteGraphFromMonarchsAndSubGraph(bipartiteGraph);
+        result.addBipartiteGraphToDraw("[ASSIGN DOMAINS] Bipartite Graph", bipartiteGraph);
 
         System.out.println("\tCalculating Minimum Cost Maximum Flow...");
         //Calculating minCostMaxFlow
@@ -285,68 +316,6 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         });
 
         System.out.println("\nEND ASSIGN DOMAINS ALGORITHM\n");
-
-//        //Construct directed bipartite graph
-//        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
-//        subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
-//        //copy monarch set into bipartite graph
-//        //Set<Vertex> monarchs = new HashSet<>();
-//        Map<Vertex, Vertex> monarchCopies = new HashMap<>();
-//        m.forEach(x -> monarchCopies.put(x, new Vertex(x.getX(), x.getY(), GREEN)));
-//        monarchCopies.values().forEach(bipartiteGraph::addVertex);
-//        //E'
-//        monarchCopies.forEach((original, monarch) -> getAdjacentVerticesUpToDistance(subGraph, original.getMajor(), 2)
-//                .forEach(adjacentVertex -> {
-//                    //if (!monarch.equals(adjacentVertex)) {
-//                        bipartiteGraph.addEdge(monarch, adjacentVertex);
-//                    //}
-//                }));
-//
-//        //add s and t
-//        Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
-//        Vertex target = new Vertex(maxXCoordinate - 10, maxYCoordinate - 10, BLUE);
-//        bipartiteGraph.addVertex(source);
-//        bipartiteGraph.addVertex(target);
-//
-//        //for m ∈ M add edge (s, m) and set (s, m) capacity to L
-//        monarchCopies.values().forEach(monarch -> {
-//            bipartiteGraph.addEdge(source, monarch);
-//            bipartiteGraph.getEdge(source, monarch).setCapacity(maxClientsPerCenter);
-//        });
-//
-//        //for v ∈ V add edge (v, t) and set (s, m) capacity to 1
-//        subGraph.vertexSet().forEach(vertex -> {
-//            bipartiteGraph.addEdge(vertex, target);
-//            bipartiteGraph.getEdge(vertex, target).setCapacity(1);
-//        });
-//
-//        //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
-//        monarchCopies.forEach((orig, monarch) -> subGraph.vertexSet()
-//                .forEach(vertex -> {
-//                    if (bipartiteGraph.getEdge(monarch, vertex) != null) {
-//                        bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
-//                        if (orig.equals(vertex)) {
-//                            bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
-//                        }
-//                    }
-//                }));
-//
-//        //calculate minimum cost maximum flow
-//        Map<WeightedEdgeWithCapacity, Double> flowMap = new CapacityScalingMinimumCostFlow<Vertex, WeightedEdgeWithCapacity>()
-//                .getMinimumCostFlow(new MinimumCostFlowProblemImpl<>(
-//                        bipartiteGraph,
-//                        vertex -> getVertexSupply(source, target, vertex),
-//                        edge -> getEdgeCapacity(bipartiteGraph, edge), //max directed edge capacity
-//                        edge -> 0)) //min directed edge capacity
-//                .getFlowMap();
-//
-//        //for m ∈ M add v to dom(m) if v receives one unit of flow from m
-//        monarchCopies.forEach((orig, monarch) -> {
-//            orig.setColor(RED);
-//            orig.setClients(getClients(bipartiteGraph, flowMap, monarch));
-//            orig.getClients().forEach(client -> client.setCenter(orig));
-//            System.out.println("monarch clients: " + orig.getClients().size());
-//        });
     }
 
     private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter, int maxFailedCenters) {
@@ -434,7 +403,7 @@ free node => node.getColor().equals(BLACK)
         }
 
         //M' = all centers allocated so far
-        long centers = subGraph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
+		long centers = getCentersCount(subGraph);
 
         //ceil(n/L) + α
         long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
@@ -446,7 +415,12 @@ free node => node.getColor().equals(BLACK)
             int centersNeeded = (int) (requiredCenters - centers);
             List<Vertex> freeNodes = getFreeNodes(new ArrayList<>(subGraph.vertexSet()));
             shuffleAndReduceToSize(freeNodes, centersNeeded).forEach(center -> center.setColor(RED));
+			long centersAfterRandomAssign = getCentersCount(subGraph);
+			System.out.println("\tNumber of free nodes to choose from: " + freeNodes.size());
+			System.out.println("\tCenters after random assign: " + centersAfterRandomAssign);
         }
+
+        result.addGraphToDraw("[RE-ASSIGN DOMAINS] Connected Component", subGraph);
 
         System.out.println("\nEND REASSIGN ALGORITHM\n");
     }
@@ -624,7 +598,7 @@ free node => node.getColor().equals(BLACK)
                     }
                 }));
 
-        result.addBipartiteGraphFromMonarchsAndSubGraph(bipartiteGraph);
+		result.addBipartiteGraphToDraw("[ASSIGN DOMAINS] Bipartite Graph", bipartiteGraph);
 
         System.out.println("\tCalculating Minimum Cost Maximum Flow...");
         //Calculating minCostMaxFlow
