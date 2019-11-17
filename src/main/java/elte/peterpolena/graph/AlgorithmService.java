@@ -598,7 +598,7 @@ free node => node.getColor().equals(BLACK)
                     }
                 }));
 
-        result.addBipartiteGraphFromMonarchsAndSubGraph(bipartiteGraph);
+		result.addBipartiteGraphToDraw("[ASSIGN DOMAINS] Bipartite Graph", bipartiteGraph);
 
         System.out.println("\tCalculating Minimum Cost Maximum Flow...");
         //Calculating minCostMaxFlow
