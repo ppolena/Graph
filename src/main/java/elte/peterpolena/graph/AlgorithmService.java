@@ -7,36 +7,11 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-import static elte.peterpolena.graph.Config.maxXCoordinate;
-import static elte.peterpolena.graph.Config.maxYCoordinate;
-import static elte.peterpolena.graph.Config.minXCoordinate;
-import static elte.peterpolena.graph.Config.minYCoordinate;
-import static elte.peterpolena.graph.Config.vertexRadius;
-import static elte.peterpolena.graph.Utils.addEdgesUpToMaxWeightToSubGraph;
-import static elte.peterpolena.graph.Utils.getALeaf;
-import static elte.peterpolena.graph.Utils.getAdjacentVerticesAtDistance;
-import static elte.peterpolena.graph.Utils.getAdjacentVerticesUpToDistance;
-import static elte.peterpolena.graph.Utils.getCentersCount;
-import static elte.peterpolena.graph.Utils.getComponentNodeCount;
-import static elte.peterpolena.graph.Utils.getFreeNodes;
-import static elte.peterpolena.graph.Utils.getRandomVertexFromDistance;
-import static elte.peterpolena.graph.Utils.getRequiredCenters;
-import static elte.peterpolena.graph.Utils.getRequiredCentersPerComponent;
-import static elte.peterpolena.graph.Utils.getSubGraph;
-import static elte.peterpolena.graph.Utils.getTreePathTo;
-import static elte.peterpolena.graph.Utils.hasUnmarkedNodesFurther;
-import static elte.peterpolena.graph.Utils.shuffleAndReduceToSize;
-import static java.awt.Color.BLUE;
-import static java.awt.Color.CYAN;
-import static java.awt.Color.GREEN;
-import static java.awt.Color.RED;
+import static elte.peterpolena.graph.Config.*;
+import static elte.peterpolena.graph.Utils.*;
+import static java.awt.Color.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
@@ -308,7 +283,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         //Calculating minCostMaxFlow
         MinCostMaxFlowService minCost = new MinCostMaxFlowService();
         Map<Vertex, Set<Vertex>> flow = minCost
-                .getFlow(subGraph, m, maxClientsPerCenter);
+                .getFlow(subGraph, m, maxClientsPerCenter, true);
         flow.forEach((from, to) -> {
             from.setColor(RED);
             from.setClients(to);
@@ -566,7 +541,7 @@ free node => node.getColor().equals(BLACK)
         });
         monarchCopies.values().forEach(bipartiteGraph::addVertex);
         //E'
-        monarchCopies.forEach((original, monarch) -> getAdjacentVerticesUpToDistance(subGraph, original.getMajor(), 2)
+        monarchCopies.forEach((original, monarch) -> getAdjacentVerticesUpToDistance(subGraph, original, 2)
                 .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, adjacentVertex)));
 
         //add s and t
@@ -604,7 +579,7 @@ free node => node.getColor().equals(BLACK)
         //Calculating minCostMaxFlow
         MinCostMaxFlowService minCost = new MinCostMaxFlowService();
         Map<Vertex, Set<Vertex>> flow = minCost
-                .getFlow(subGraph, m, maxClientsPerCenter);
+                .getFlow(subGraph, m, maxClientsPerCenter, false);
         flow.forEach((from, to) -> {
             from.setColor(RED);
             from.setClients(to);

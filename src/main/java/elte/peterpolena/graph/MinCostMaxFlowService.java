@@ -1,7 +1,6 @@
 package elte.peterpolena.graph;
 
 import org.jgrapht.Graph;
-import org.jgrapht.Graphs;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 import java.util.*;
@@ -79,7 +78,7 @@ public class MinCostMaxFlowService {
         return new int[]{ totflow, totcost };
     }
 
-    public Map<Vertex, Set<Vertex>> getFlow(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> monarchs, int maxClientsPerCenter) {
+    public Map<Vertex, Set<Vertex>> getFlow(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> monarchs, int maxClientsPerCenter, boolean majorNeeded) {
         Map<Vertex, Set<Vertex>> ret = new HashMap<>();
         N = graph.vertexSet().size() + monarchs.size() + 2;
         Map<Vertex, Integer> monarchIndexes = new HashMap<>();
@@ -99,7 +98,7 @@ public class MinCostMaxFlowService {
             }
 
         monarchIndexes.forEach((v, i) -> {
-            Utils.getAdjacentVerticesUpToDistance(graph, v.getMajor(), 2).forEach(x -> {
+            Utils.getAdjacentVerticesUpToDistance(graph, majorNeeded ? v.getMajor() : v, 2).forEach(x -> {
                 cap[i][vertexIndexes.get(x)] = 1;
                 cost[i][vertexIndexes.get(x)] = v == x ? 0 : 1;
             });
