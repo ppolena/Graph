@@ -108,8 +108,9 @@ public class Window {
         JButton reloadButton = new JButton("Reload");
         reloadButton.setToolTipText("Reload current graph with new edge weights");
         reloadButton.addActionListener(e -> {
-            Graph<Vertex, DefaultWeightedEdge> generateGraph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
-            drawGraph(generateGraph);
+			Graph<Vertex, DefaultWeightedEdge> generatedGraph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
+			drawGraph(generatedGraph);
+			descriptionLabel.setText("Vertices: " + generatedGraph.vertexSet().size() + ", Edges: " + generatedGraph.edgeSet().size());
         });
 
         JSpinner maxCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
