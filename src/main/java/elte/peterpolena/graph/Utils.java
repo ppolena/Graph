@@ -202,14 +202,18 @@ public class Utils {
 
     public static Graph<Vertex, DefaultWeightedEdge> copy(Graph<Vertex, DefaultWeightedEdge> graph) {
         Graph<Vertex, DefaultWeightedEdge> copy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-        graph.edgeSet().forEach(edge -> {
-            Vertex source = new Vertex(graph.getEdgeSource(edge));
-            Vertex target = new Vertex(graph.getEdgeTarget(edge));
-            copy.addVertex(source);
-            copy.addVertex(target);
-            copy.addEdge(source, target);
-            copy.setEdgeWeight(source, target, graph.getEdgeWeight(edge));
-        });
+		if (!graph.edgeSet().isEmpty()) {
+			graph.edgeSet().forEach(edge -> {
+				Vertex source = new Vertex(graph.getEdgeSource(edge));
+				Vertex target = new Vertex(graph.getEdgeTarget(edge));
+				copy.addVertex(source);
+				copy.addVertex(target);
+				copy.addEdge(source, target);
+				copy.setEdgeWeight(source, target, graph.getEdgeWeight(edge));
+			});
+		} else if (!graph.vertexSet().isEmpty()) {
+			graph.vertexSet().forEach(vertex -> copy.addVertex(new Vertex(vertex)));
+		}
         return copy;
     }
 

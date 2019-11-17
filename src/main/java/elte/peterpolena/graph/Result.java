@@ -2,63 +2,38 @@ package elte.peterpolena.graph;
 
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultWeightedEdge;
-import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+
+import static java.awt.Color.MAGENTA;
+import static java.awt.Color.PINK;
 
 public class Result {
 
 	private Graph<Vertex, DefaultWeightedEdge> originalGraph;
-	private Map<Graph<Vertex, DefaultWeightedEdge>, Set<Graph<Vertex, DefaultWeightedEdge>>> subGraphsAndConnectedComponents;
-	private List<Set<Vertex>> majorMonarchs;
-	private List<Set<Vertex>> minorMonarchs;
-	private List<Set<Vertex>> monarchs;
-	private List<Graph<Vertex, WeightedEdgeWithCapacity>> bipartiteGraphs;
-    private Graph<Vertex, DefaultWeightedEdge> result;
+	private List<Graph<Vertex, DefaultWeightedEdge>> graphsToDraw;
+	private List<String> descriptions;
 
     public Result() {
 		this.originalGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-        this.subGraphsAndConnectedComponents = new LinkedHashMap<>();
-		this.majorMonarchs = new ArrayList<>();
-		this.minorMonarchs = new ArrayList<>();
-		this.monarchs = new ArrayList<>();
-		this.bipartiteGraphs = new ArrayList<>();
-        this.result = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+		this.graphsToDraw = new ArrayList<>();
+		this.descriptions = new ArrayList<>();
     }
 
 	public Graph<Vertex, DefaultWeightedEdge> getOriginalGraph() {
 		return originalGraph;
     }
 
-	public Map<Graph<Vertex, DefaultWeightedEdge>, Set<Graph<Vertex, DefaultWeightedEdge>>> getSubGraphsAndConnectedComponents() {
-		return subGraphsAndConnectedComponents;
-    }
+	public List<Graph<Vertex, DefaultWeightedEdge>> getGraphsToDraw() {
+		return this.graphsToDraw;
+	}
 
-	public List<Set<Vertex>> getMajorMonarchs() {
-		return majorMonarchs;
-    }
-
-	public List<Set<Vertex>> getMinorMonarchs() {
-		return minorMonarchs;
-    }
-
-	public List<Set<Vertex>> getMonarchs() {
-		return monarchs;
-    }
-
-	public List<Graph<Vertex, WeightedEdgeWithCapacity>> getBipartiteGraphs() {
-		return bipartiteGraphs;
-    }
-
-    public Graph<Vertex, DefaultWeightedEdge> getResult() {
-        return this.result;
-    }
+	public List<String> getDescriptions() {
+		return this.descriptions;
+	}
 
 	public void setOriginalGraph(final Graph<Vertex, DefaultWeightedEdge> originalGraph) {
         originalGraph.edgeSet().forEach(edge -> {
@@ -71,98 +46,77 @@ public class Result {
         });
     }
 
-//    public void addSubGraphOfOriginalGraphByWeight(final Graph<Vertex, DefaultWeightedEdge> subGraphOfOriginalGraphByWeight) {
-//        Graph<Vertex, DefaultWeightedEdge> subGraphCopy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-//        subGraphOfOriginalGraphByWeight.edgeSet().forEach(edge -> {
-//            Vertex source = new Vertex(subGraphOfOriginalGraphByWeight.getEdgeSource(edge));
-//            Vertex target = new Vertex(subGraphOfOriginalGraphByWeight.getEdgeTarget(edge));
-//            subGraphCopy.addVertex(source);
-//            subGraphCopy.addVertex(target);
-//            subGraphCopy.addEdge(source, target);
-//            subGraphCopy.setEdgeWeight(source, target, subGraphOfOriginalGraphByWeight.getEdgeWeight(edge));
-//        });
-//        this.subGraphsOfOriginalGraphByWeight.add(subGraphCopy);
-//    }
+	public void addGraphToDraw(final String description, final Graph<Vertex, DefaultWeightedEdge> graphToDraw) {
+		System.out.println("\t\t\tADDING " + description);
+		Graph<Vertex, DefaultWeightedEdge> copyOfGraphToDraw = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+		if (!graphToDraw.edgeSet().isEmpty()) {
+			graphToDraw.edgeSet().forEach(edge -> {
+				Vertex source = new Vertex(graphToDraw.getEdgeSource(edge));
+				Vertex target = new Vertex(graphToDraw.getEdgeTarget(edge));
+				copyOfGraphToDraw.addVertex(source);
+				copyOfGraphToDraw.addVertex(target);
+				copyOfGraphToDraw.addEdge(source, target);
+				copyOfGraphToDraw.setEdgeWeight(source, target, graphToDraw.getEdgeWeight(edge));
+			});
+			add(description, copyOfGraphToDraw);
+		} else if (!graphToDraw.vertexSet().isEmpty()) {
+			graphToDraw.vertexSet().forEach(vertex -> copyOfGraphToDraw.addVertex(new Vertex(vertex)));
+			add(description, copyOfGraphToDraw);
+		}
+	}
 
-	public void addConnectedComponentsOfSubGraph(final Graph<Vertex, DefaultWeightedEdge> subGraphOfOriginalGraphByWeight,
-												 final Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponentsOfSubGraph) {
+	public void addGraphWithMonarchsToDraw(final String description, final Graph<Vertex, DefaultWeightedEdge> graphToDraw, Set<Vertex> minors, Set<Vertex> majors) {
+		System.out.println("\t\t\tADDING " + description);
+		Graph<Vertex, DefaultWeightedEdge> copyOfGraphToDraw = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+		if (!graphToDraw.edgeSet().isEmpty()) {
+			graphToDraw.edgeSet().forEach(edge -> {
+				Vertex originalEdgeSource = graphToDraw.getEdgeSource(edge);
+				Vertex originalEdgeTarget = graphToDraw.getEdgeTarget(edge);
+				Vertex source = new Vertex(originalEdgeSource);
+				Vertex target = new Vertex(originalEdgeTarget);
+				setMonarchColor(minors, majors, originalEdgeSource, source);
+				setMonarchColor(minors, majors, originalEdgeTarget, target);
+				copyOfGraphToDraw.addVertex(source);
+				copyOfGraphToDraw.addVertex(target);
+				copyOfGraphToDraw.addEdge(source, target);
+				copyOfGraphToDraw.setEdgeWeight(source, target, graphToDraw.getEdgeWeight(edge));
+			});
+			add(description, copyOfGraphToDraw);
+		} else if (!graphToDraw.vertexSet().isEmpty()) {
+			graphToDraw.vertexSet().forEach(vertex -> copyOfGraphToDraw.addVertex(new Vertex(vertex)));
+			add(description, copyOfGraphToDraw);
+		}
+	}
 
-        Graph<Vertex, DefaultWeightedEdge> subGraphCopy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-        subGraphOfOriginalGraphByWeight.edgeSet().forEach(edge -> {
-            Vertex source = new Vertex(subGraphOfOriginalGraphByWeight.getEdgeSource(edge));
-            Vertex target = new Vertex(subGraphOfOriginalGraphByWeight.getEdgeTarget(edge));
-            subGraphCopy.addVertex(source);
-            subGraphCopy.addVertex(target);
-            subGraphCopy.addEdge(source, target);
-            subGraphCopy.setEdgeWeight(source, target, subGraphOfOriginalGraphByWeight.getEdgeWeight(edge));
-        });
+	public void addBipartiteGraphToDraw(final String description, final Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraphToDraw) {
+		System.out.println("\t\t\tADDING " + description);
+		Graph<Vertex, DefaultWeightedEdge> copyOfBipartiteGraphToDraw = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+		if (!bipartiteGraphToDraw.edgeSet().isEmpty()) {
+			bipartiteGraphToDraw.edgeSet().forEach(edge -> {
+				Vertex source = new Vertex(bipartiteGraphToDraw.getEdgeSource(edge));
+				Vertex target = new Vertex(bipartiteGraphToDraw.getEdgeTarget(edge));
+				copyOfBipartiteGraphToDraw.addVertex(source);
+				copyOfBipartiteGraphToDraw.addVertex(target);
+				copyOfBipartiteGraphToDraw.addEdge(source, target);
+				copyOfBipartiteGraphToDraw.setEdgeWeight(source, target, bipartiteGraphToDraw.getEdgeWeight(edge));
+			});
+			add(description, copyOfBipartiteGraphToDraw);
+		} else if (!bipartiteGraphToDraw.vertexSet().isEmpty()) {
+			bipartiteGraphToDraw.vertexSet().forEach(vertex -> copyOfBipartiteGraphToDraw.addVertex(new Vertex(vertex)));
+			add(description, copyOfBipartiteGraphToDraw);
+		}
+	}
 
-        Set<Graph<Vertex, DefaultWeightedEdge>> connectedComponentsOfSubGraphCopy = new HashSet<>();
-        connectedComponentsOfSubGraph.forEach(connectedComponent -> {
-            Graph<Vertex, DefaultWeightedEdge> connectedComponentCopy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-            connectedComponent.edgeSet().forEach(edge -> {
-                Vertex source = new Vertex(connectedComponent.getEdgeSource(edge));
-                Vertex target = new Vertex(connectedComponent.getEdgeTarget(edge));
-                connectedComponentCopy.addVertex(source);
-                connectedComponentCopy.addVertex(target);
-                connectedComponentCopy.addEdge(source, target);
-                connectedComponentCopy.setEdgeWeight(source, target, connectedComponent.getEdgeWeight(edge));
-            });
-            connectedComponentsOfSubGraphCopy.add(connectedComponentCopy);
-        });
-		this.subGraphsAndConnectedComponents.put(subGraphCopy, connectedComponentsOfSubGraphCopy);
-    }
+	private void setMonarchColor(Set<Vertex> minors, Set<Vertex> majors, Vertex originalVertex, Vertex copiedVertex) {
+		if (minors.contains(originalVertex)) {
+			copiedVertex.setColor(PINK);
+		} else if (majors.contains(originalVertex)) {
+			copiedVertex.setColor(MAGENTA);
+		}
+	}
 
-	public void addMajorMonarchs(final Set<Vertex> majorMonarchs) {
-        Set<Vertex> majorMonarchsCopy = new HashSet<>();
-        majorMonarchs.forEach(majorMonarch -> majorMonarchsCopy.add(new Vertex(majorMonarch)));
-		this.majorMonarchs.add(majorMonarchsCopy);
-    }
-
-	public void addMinorMonarchs(final Set<Vertex> minorMonarchs) {
-        Set<Vertex> minorMonarchsCopy = new HashSet<>();
-        minorMonarchs.forEach(minorMonarch -> minorMonarchsCopy.add(new Vertex(minorMonarch)));
-		this.minorMonarchs.add(minorMonarchsCopy);
-    }
-
-	public void addMonarchs(final Set<Vertex> monarchs) {
-        Set<Vertex> monarchsCopy = new HashSet<>();
-        monarchs.forEach(monarch -> monarchsCopy.add(new Vertex(monarch)));
-		this.monarchs.add(monarchsCopy);
-    }
-
-	public void addBipartiteGraphFromMonarchsAndSubGraph(final Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraphFromMonarchsAndSubGraph) {
-        Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraphFromMonarchsAndSubGraphCopy = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
-        bipartiteGraphFromMonarchsAndSubGraph.edgeSet().forEach(edge -> {
-            Vertex source = new Vertex(bipartiteGraphFromMonarchsAndSubGraph.getEdgeSource(edge));
-            Vertex target = new Vertex(bipartiteGraphFromMonarchsAndSubGraph.getEdgeTarget(edge));
-            bipartiteGraphFromMonarchsAndSubGraphCopy.addVertex(source);
-            bipartiteGraphFromMonarchsAndSubGraphCopy.addVertex(target);
-            bipartiteGraphFromMonarchsAndSubGraphCopy.addEdge(source, target);
-            bipartiteGraphFromMonarchsAndSubGraphCopy.setEdgeWeight(source, target, bipartiteGraphFromMonarchsAndSubGraph.getEdgeWeight(edge));
-        });
-		this.bipartiteGraphs.add(bipartiteGraphFromMonarchsAndSubGraphCopy);
-    }
-
-	public void setResult(final Graph<Vertex, DefaultWeightedEdge> result) {
-        result.edgeSet().forEach(edge -> {
-            Vertex source = new Vertex(result.getEdgeSource(edge));
-            Vertex target = new Vertex(result.getEdgeTarget(edge));
-            this.result.addVertex(source);
-            this.result.addVertex(target);
-            this.result.addEdge(source, target);
-            this.result.setEdgeWeight(source, target, result.getEdgeWeight(edge));
-        });
-    }
-
-//    public void reset(){
-//        this.originalGraph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-//        this.subGraphsOfOriginalGraphByWeightInMain.clear();
-//        this.connectedComponentsOfSubGraphsInAssignCenters.clear();
-//        this.majorMonarchs.clear();
-//        this.minorMonarchs.clear();
-//        this.monarchs.clear();
-//        this.bipartiteGraphs.clear();
-//        this.result = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-//    }
+	private void add(String description, Graph<Vertex, DefaultWeightedEdge> copyOfGraphToDraw) {
+		this.graphsToDraw.add(copyOfGraphToDraw);
+		this.descriptions.add(description);
+	}
 }
