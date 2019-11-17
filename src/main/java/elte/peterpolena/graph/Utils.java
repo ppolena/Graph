@@ -8,9 +8,9 @@ import org.jgrapht.graph.SimpleWeightedGraph;
 import java.util.*;
 
 import static java.awt.Color.BLACK;
-import static java.awt.Color.BLUE;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.apache.commons.collections4.CollectionUtils.intersection;
 
 public class Utils {
 
@@ -182,11 +182,17 @@ public class Utils {
     }
 
     public static boolean hasUnmarkedNodesFurther(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> fromSet, int distance) {
-        return true; //TODO implement
+        Set<Vertex> allVertex = new HashSet<>(graph.vertexSet());
+        fromSet.forEach(x -> allVertex.removeAll(getAdjacentVerticesUpToDistance(graph, x, distance)));
+        return !allVertex.isEmpty();
     }
 
     public static Vertex getRandomVertexFromDistance(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> distanceFrom, List<Vertex> fromList, int distance) {
-        return new Vertex(0, 0, BLUE); //TODO implement
+        Set<Vertex> allVertex = new HashSet<>();
+        distanceFrom.forEach(x -> allVertex.addAll(getAdjacentVerticesAtDistance(graph, x, distance)));
+        distanceFrom.forEach(x -> allVertex.removeAll(getAdjacentVerticesUpToDistance(graph, x, distance - 1)));
+
+        return intersection(allVertex, fromList).stream().findAny().get();
     }
 
     public static Vertex getALeaf(Set<Vertex> tree) {

@@ -751,5 +751,41 @@ free node => node.getColor().equals(BLACK)
         }
     }
 
+    //Will not be implemented...
+    /*private void chainRoutingProblem(Graph<Vertex, WeightedEdgeWithCapacity> subGraph, Map<WeightedEdgeWithCapacity, Integer> load) {
+        boolean toContinue = false;
+        double lambda = 5;
+        double gamma = 2;
+        int numberOfEdges = subGraph.edgeSet().size();
+        do {
+            Graph<Vertex, WeightedEdgeWithCapacity> calcGraph = new SimpleWeightedGraph<>(WeightedEdgeWithCapacity.class);
+            subGraph.vertexSet().forEach(calcGraph::addVertex);
+            Map<WeightedEdgeWithCapacity, WeightedEdgeWithCapacity> edgeToEdge = new HashMap<>();
+            for(WeightedEdgeWithCapacity e : subGraph.edgeSet()) {
+                WeightedEdgeWithCapacity newEdge = calcGraph.addEdge(subGraph.getEdgeSource(e), subGraph.getEdgeTarget(e));
+                newEdge.setCapacity(e.getCapacity());
+                edgeToEdge.put(newEdge, e);
+                //TODO replace 88 with di(k)
+                calcGraph.setEdgeWeight(newEdge,
+                        Math.pow(gamma, load.get(e) / (newEdge.getCapacity() * lambda))
+                                * (Math.pow(gamma, 88 / (newEdge.getCapacity() * lambda)) - 1));
+            };
+
+            //TODO calculate shortest path tour
+            List<WeightedEdgeWithCapacity> shortestpathtour = new ArrayList<>();
+
+            for(WeightedEdgeWithCapacity e : shortestpathtour) {
+                int edgeLoad = load.get(edgeToEdge.get(e));
+                int trafficInWalk = 12; //TODO
+                if(edgeLoad + trafficInWalk >= lambda * (Math.log(4 * numberOfEdges) / Math.log(gamma))) {
+                    lambda = lambda * 2;
+                    toContinue = true;
+                    break;
+                }
+            }
+        } while(toContinue);
+
+    }*/
+
 
 }
