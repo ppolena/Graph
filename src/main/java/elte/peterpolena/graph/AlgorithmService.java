@@ -233,20 +233,26 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("\tConstructing bipartite graph...");
 
         Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
-        subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
+
+        Map<Vertex, Vertex> vertexCopies = new HashMap<>();
+        subGraph.vertexSet().forEach(x -> {
+            vertexCopies.put(x, new Vertex((x.getX() - minXCoordinate) / 2 + minXCoordinate + (maxXCoordinate - minXCoordinate) / 2, (x.getY() - (maxYCoordinate - minYCoordinate) / 2) / 2 + (maxYCoordinate - minYCoordinate) / 2, BLACK));
+        });
+        vertexCopies.values().forEach(bipartiteGraph::addVertex);
         //copy monarch set into bipartite graph
         Map<Vertex, Vertex> monarchCopies = new HashMap<>();
         m.forEach(x -> {
-            int diffPlacement = -50 - vertexRadius;
+            /*int diffPlacement = -50 - vertexRadius;
             if (x.getX() > (maxXCoordinate - minXCoordinate) / 2) {
                 diffPlacement += 100 + vertexRadius;
             }
-            monarchCopies.put(x, new Vertex(x.getX() + diffPlacement , x.getY(), GREEN));
+            monarchCopies.put(x, new Vertex(x.getX() + diffPlacement , x.getY(), GREEN));*/
+            monarchCopies.put(x, new Vertex((x.getX() - minXCoordinate) / 2 + minXCoordinate, (x.getY() - (maxYCoordinate - minYCoordinate) / 2) / 2 + (maxYCoordinate - minYCoordinate) / 2, GREEN));
         });
         monarchCopies.values().forEach(bipartiteGraph::addVertex);
         //E'
         monarchCopies.forEach((original, monarch) -> getAdjacentVerticesUpToDistance(subGraph, original.getMajor(), 2)
-                .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, adjacentVertex)));
+                .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, vertexCopies.get(adjacentVertex))));
 
         //add s and t
         Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, CYAN);
@@ -261,17 +267,17 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         });
 
         //for v ∈ V add edge (v, t) and set (s, m) capacity to 1
-        subGraph.vertexSet().forEach(vertex -> {
+        vertexCopies.values().forEach(vertex -> {
             bipartiteGraph.addEdge(vertex, target);
             bipartiteGraph.getEdge(vertex, target).setCapacity(1);
         });
 
         //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
-        monarchCopies.forEach((original, monarch) -> subGraph.vertexSet()
-                .forEach(vertex -> {
+        monarchCopies.forEach((original, monarch) -> vertexCopies
+                .forEach((origV, vertex) -> {
                     if (bipartiteGraph.getEdge(monarch, vertex) != null) {
                         bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
-                        if (original.equals(vertex)) {
+                        if (original.equals(origV)) {
                             bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
                         }
                     }
