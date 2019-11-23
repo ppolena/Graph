@@ -45,6 +45,10 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("\nSTART MAIN ALGORITHM\n");
 
         graph.vertexSet().forEach(Vertex::clearData);
+        graph.edgeSet().forEach(e -> {
+            graph.getEdgeSource(e).clearData();
+            graph.getEdgeTarget(e).clearData();
+        });
         System.out.println("\tK: " + maxCenters);
         System.out.println("\tL: " + maxClientsPerCenter);
 
@@ -93,9 +97,22 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("\nSTART ASSIGN CENTERS ALGORITHM\n");
 
 		subGraph.vertexSet().forEach(Vertex::clearData);
+        subGraph.edgeSet().forEach(e -> {
+            subGraph.getEdgeSource(e).clearData();
+            subGraph.getEdgeTarget(e).clearData();
+        });
 		ConnectivityInspector<Vertex, DefaultWeightedEdge> connectivityInspector = new ConnectivityInspector<>(subGraph);
 
-        List<Set<Vertex>> connectedComponents = connectivityInspector.connectedSets();
+        List<Set<Vertex>> connectedComponentsBad = connectivityInspector.connectedSets();
+
+        List<Set<Vertex>> connectedComponents = new ArrayList<>();
+        connectedComponentsBad.forEach(x -> {
+            Set<Vertex> newSet = new HashSet<>();
+            x.forEach(edge -> {
+                newSet.add(subGraph.vertexSet().stream().filter(y -> y.equals(edge)).findAny().get());
+            });
+            connectedComponents.add(newSet);
+        });
 
         List<Integer> componentNodeCount = getComponentNodeCount(connectedComponents);
 
@@ -528,6 +545,7 @@ free node => node.getColor().equals(BLACK)
         }
         m.addAll(m1);
         m.addAll(m2);
+        result.addGraphWithMonarchsToDraw("[SELECT MONARCHS] Connected Component", subGraph, m2, m1);
     }
 
     private void conservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
