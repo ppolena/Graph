@@ -201,7 +201,8 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         m1.clear();
         m2.clear();
         m.clear();
-        conservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
+        if (!conservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters))
+            return false;
         conservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
         conservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
         return true;
@@ -517,11 +518,11 @@ free node => node.getColor().equals(BLACK)
                 if (newHome.getClients().contains(x))
                     reassignedClients.add(x);
             });
-            result.addGraphToDraw("Failed center's clients", Utils.copyHighlight(subGraph, reassignedClients, newHome, RED));
+            result.addGraphToDraw("New assigned center for clients", Utils.copyHighlight(subGraph, reassignedClients, newHome, RED));
         });
     }
 
-    private void conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
+    private boolean conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
         List<Vertex> unmarkedNodes = new ArrayList<>();
         List<Vertex> vertices = new ArrayList<>(subGraph.vertexSet());
         unmarkedNodes.add(vertices.stream().findAny().get());
@@ -606,6 +607,7 @@ free node => node.getColor().equals(BLACK)
         allOfM1.addAll(m1);
         allOfM2.addAll(m2);
         result.addGraphWithMonarchsToDraw("[SELECT MONARCHS] Connected Component", subGraph, m2, m1);
+        return m1.stream().allMatch(x -> x.getBackupCenters().size() == maxFailedCenters);
     }
 
     private void conservativeAssignDomainsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
@@ -683,7 +685,11 @@ free node => node.getColor().equals(BLACK)
     private void conservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter) {
         Map<Vertex, Set<Vertex>> unassigned = new HashMap<>();
         Map<Vertex, Set<Vertex>> passed = new HashMap<>();
+
+        Set<Vertex> backupCenters = new HashSet<>();
+
         for(Vertex monarch : m) {
+            backupCenters.addAll(monarch.getBackupCenters());
             Set<Vertex> temp = new HashSet<>();
             temp.add(monarch);
             temp.addAll(monarch.getEmpire());
@@ -692,9 +698,10 @@ free node => node.getColor().equals(BLACK)
         }
 
 
+
         Set<Vertex> monarchTree = new HashSet<>();
         monarchTree.addAll(m);
-        monarchTree.forEach(m -> passed.put(m, new HashSet<>()));
+        subGraph.vertexSet().forEach(m -> passed.put(m, new HashSet<>()));
 
         while(!monarchTree.isEmpty()) {
             Vertex mon = getALeaf(monarchTree);
@@ -710,7 +717,9 @@ free node => node.getColor().equals(BLACK)
                     List<Vertex> nodesToAssignToCenters = shuffleAndReduceToSize(passedVertices, k * maxClientsPerCenter);
 
                     passedVertices.removeAll(nodesToAssignToCenters);
-                    List<Vertex> centers = shuffleAndReduceToSize(getFreeNodes(subGraph.vertexSet().stream().filter(x -> x.getDeputy() == u).collect(toList())), k);
+                    List<Vertex> centers = shuffleAndReduceToSize(getFreeNodes(subGraph.vertexSet().stream()
+                            .filter(x -> x.getDeputy() == u)
+                            .filter(x -> !backupCenters.contains(x)).collect(toList())), k);
                     centers.forEach(center -> center.setColor(RED));
 
                     //create L sized sublist from k'L nodes
@@ -741,7 +750,8 @@ free node => node.getColor().equals(BLACK)
             //client => BLACK
 
             //select k' centers from m.getEmpire()
-            List<Vertex> centers = shuffleAndReduceToSize(getFreeNodes(mon.getEmpire()), k);
+            List<Vertex> centers = shuffleAndReduceToSize(
+                    getFreeNodes(mon.getEmpire()).stream().filter(x -> !backupCenters.contains(x)).collect(toList()), k);
             centers.forEach(center -> center.setColor(RED));
 
             //select k'L free nodes from unassigned(m) + passed(m)
@@ -779,7 +789,7 @@ free node => node.getColor().equals(BLACK)
                 passed.get(mon.getDeputy()).addAll(releasedClients);
             } else {
                 if (!releasedClients.isEmpty()) {
-                    Vertex center = getFreeNodes(mon.getEmpire()).stream().findAny().get();
+                    Vertex center = getFreeNodes(mon.getEmpire()).stream().filter(x -> !backupCenters.contains(x)).findAny().get();
                     center.setColor(RED);
                     center.addClients(new HashSet<>(releasedClients));
                     center.getClients().forEach(client -> client.setCenter(center));
@@ -800,6 +810,14 @@ free node => node.getColor().equals(BLACK)
             result.addGraphToDraw("Failed center's clients", Utils.copyHighlight(subGraph, failed.getClients(), failed, YELLOW));
         });
 
+        Set<Vertex> allBackupCenters = new HashSet<>();
+        subGraph.vertexSet().forEach(x -> allBackupCenters.addAll(x.getBackupCenters()));
+        System.out.println("new home needed: " + needNewHome.size());
+        System.out.println("backup center count: " + allBackupCenters.size());
+        subGraph.vertexSet().stream().filter(x -> x.getColor() == RED).forEach(x -> {
+            System.out.println("center's fullness: " + x.getClients().size());
+        });
+
         failedCenters.forEach(f -> {
             Vertex inspectedMonarch = f;
             while (inspectedMonarch != null && inspectedMonarch.getBackupCenters().stream().filter(x -> !failedCenters.contains(x)).collect(toSet()).isEmpty()) {
@@ -813,6 +831,7 @@ free node => node.getColor().equals(BLACK)
             newCenter.getClients().addAll(f.getClients());
             newCenter.getClients().forEach(x -> x.setCenter(newCenter));
             f.getClients().clear();
+            inspectedMonarch.getBackupCenters().remove(newCenter);
 
             newCenter.setColor(RED);
             f.setColor(BLACK);
@@ -828,7 +847,7 @@ free node => node.getColor().equals(BLACK)
                 if (newHome.getClients().contains(x))
                     reassignedClients.add(x);
             });
-            result.addGraphToDraw("Failed center's clients", Utils.copyHighlight(subGraph, reassignedClients, newHome, RED));
+            result.addGraphToDraw("New assigned center for clients", Utils.copyHighlight(subGraph, reassignedClients, newHome, RED));
         });
     }
 
