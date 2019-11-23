@@ -1,12 +1,8 @@
 package elte.peterpolena.graph;
 
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 public class Vertex {
 
@@ -29,6 +25,7 @@ vertex.getCenter() = ctr(v)
     private boolean isMarked;
     private boolean isMonarch;
     private Vertex deputy;
+    private Set<Vertex> backupCenters;
 
     public Vertex(int x, int y, Color color){
         this.x = x;
@@ -40,6 +37,7 @@ vertex.getCenter() = ctr(v)
         this.clients = new HashSet<>();
         this.isMarked = false;
         this.isMonarch = false;
+        this.backupCenters = new HashSet<>();
     }
 
     public Vertex(Vertex vertex) {
@@ -52,6 +50,7 @@ vertex.getCenter() = ctr(v)
         this.clients = new HashSet<>();
         this.isMarked = false;
         this.isMonarch = false;
+        this.backupCenters = new HashSet<>();
     }
 
     public int getX() {
@@ -160,6 +159,10 @@ vertex.getCenter() = ctr(v)
 
     public Vertex getCenter() {
         return center;
+    }
+
+    public Set<Vertex> getBackupCenters() {
+        return backupCenters;
     }
 
     public void clearData() {

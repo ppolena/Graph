@@ -7,40 +7,11 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-import static elte.peterpolena.graph.Config.maxXCoordinate;
-import static elte.peterpolena.graph.Config.maxYCoordinate;
-import static elte.peterpolena.graph.Config.minXCoordinate;
-import static elte.peterpolena.graph.Config.minYCoordinate;
-import static elte.peterpolena.graph.Config.vertexRadius;
-import static elte.peterpolena.graph.Utils.addEdgesUpToMaxWeightToSubGraph;
-import static elte.peterpolena.graph.Utils.copy;
-import static elte.peterpolena.graph.Utils.getALeaf;
-import static elte.peterpolena.graph.Utils.getAdjacentVerticesAtDistance;
-import static elte.peterpolena.graph.Utils.getAdjacentVerticesUpToDistance;
-import static elte.peterpolena.graph.Utils.getCenters;
-import static elte.peterpolena.graph.Utils.getCentersCount;
-import static elte.peterpolena.graph.Utils.getComponentNodeCount;
-import static elte.peterpolena.graph.Utils.getFreeNodes;
-import static elte.peterpolena.graph.Utils.getRandomVertexFromDistance;
-import static elte.peterpolena.graph.Utils.getRequiredCenters;
-import static elte.peterpolena.graph.Utils.getRequiredCentersPerComponent;
-import static elte.peterpolena.graph.Utils.getSubGraph;
-import static elte.peterpolena.graph.Utils.getTreePathTo;
-import static elte.peterpolena.graph.Utils.hasUnmarkedNodesFurther;
-import static elte.peterpolena.graph.Utils.shuffleAndReduceToSize;
-import static java.awt.Color.BLACK;
-import static java.awt.Color.BLUE;
-import static java.awt.Color.CYAN;
-import static java.awt.Color.GREEN;
-import static java.awt.Color.ORANGE;
-import static java.awt.Color.RED;
+import static elte.peterpolena.graph.Config.*;
+import static elte.peterpolena.graph.Utils.*;
+import static java.awt.Color.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
@@ -64,6 +35,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     private Set<Vertex> m2 = new HashSet<>();
     private Set<Vertex> m = new HashSet<>();
     private Result result = new Result();
+    private Set<Vertex> allOfM1 = new HashSet<>();
+    private Set<Vertex> allOfM2 = new HashSet<>();
+    private Set<Vertex> allOfM = new HashSet<>();
 
     public Result mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
 								int maxCenters,
@@ -113,7 +87,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 					Set<Vertex> failedCenters = new HashSet<>(shuffleAndReduceToSize(new ArrayList<>(getCenters(graph)), maxFailedCenters));
 					showFailedCenters(graph, failedCenters);
 					if (isConservative) {
-						//TODO
+                        conservativeReAssignByFailedAlgorithm(subGraph, failedCenters, maxClientsPerCenter);
 					} else {
 						nonConservativeReAssignByFailedAlgorithm(subGraph, failedCenters, maxClientsPerCenter);
 					}
@@ -135,6 +109,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
         System.out.println("\nSTART ASSIGN CENTERS ALGORITHM\n");
 
+        allOfM.clear();
+        allOfM1.clear();
+        allOfM2.clear();
 		subGraph.vertexSet().forEach(Vertex::clearData);
         subGraph.edgeSet().forEach(e -> {
             subGraph.getEdgeSource(e).clearData();
@@ -276,6 +253,9 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         // M = M1 UNION M2
         m.addAll(m1);
         m.addAll(m2);
+        allOfM.addAll(m);
+        allOfM1.addAll(m1);
+        allOfM2.addAll(m2);
 
         result.addGraphWithMonarchsToDraw("[SELECT MONARCHS] Connected Component", subGraph, m2, m1);
 
@@ -469,7 +449,7 @@ free node => node.getColor().equals(BLACK)
         Map<Pair<Vertex, Vertex>, Vertex> X = new HashMap<>();
 
         failedCenters.forEach(failed -> {
-            m1.forEach(monarch -> {
+            allOfM1.forEach(monarch -> {
                 Set<Vertex> team = new HashSet<>(monarch.getMinors());
                 team.add(monarch);
                 if(!team.contains(failed)) {
@@ -493,8 +473,13 @@ free node => node.getColor().equals(BLACK)
 
                 Vertex releasedNode = client;
                 for(int i = 1; i < MP.size(); i++) {
-                    Vertex currentNode = X.get(new Pair<>(failed, MP.get(i)));
-                    X.put(new Pair<>(failed, MP.get(i)), releasedNode);
+                    Vertex currentCenter = X.get(new Pair<>(failed, MP.get(i)));
+                    Vertex currentNode = currentCenter.getClients().stream().findAny().get();
+                    if (currentNode == null)
+                        break;
+                    currentCenter.getClients().remove(currentNode);
+                    currentCenter.getClients().add(releasedNode);
+                    releasedNode.setCenter(currentCenter);
                     releasedNode = currentNode;
                 }
 
@@ -505,6 +490,8 @@ free node => node.getColor().equals(BLACK)
 
             });
         });
+
+        failedCenters.forEach(x -> x.setColor(BLACK));
     }
 
     private void conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
@@ -543,7 +530,7 @@ free node => node.getColor().equals(BLACK)
         }
         m1.forEach(m -> {
             shuffleAndReduceToSize(getAdjacentVerticesAtDistance(subGraph, m, 1), maxFailedCenters).forEach(v -> {
-                //TODO make them backup centers
+                m.getBackupCenters().add(v);
             });
         });
 
@@ -586,6 +573,9 @@ free node => node.getColor().equals(BLACK)
         }
         m.addAll(m1);
         m.addAll(m2);
+        allOfM.addAll(m);
+        allOfM1.addAll(m1);
+        allOfM2.addAll(m2);
         result.addGraphWithMonarchsToDraw("[SELECT MONARCHS] Connected Component", subGraph, m2, m1);
     }
 
@@ -764,6 +754,19 @@ free node => node.getColor().equals(BLACK)
 
         }
     }
+
+    private void conservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
+        failedCenters.forEach(f -> {
+            Vertex newCenter = f.getBackupCenters().stream().findAny().get();
+            newCenter.getClients().addAll(f.getClients());
+            newCenter.getClients().forEach(x -> x.setCenter(newCenter));
+            f.getClients().clear();
+
+            newCenter.setColor(RED);
+            f.setColor(BLACK);
+        });
+    }
+
 
 	private void showFailedCenters(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> failedCenters) {
 		//show a graph with highlighted failed centers before calling reassignedByFailed algorithm
