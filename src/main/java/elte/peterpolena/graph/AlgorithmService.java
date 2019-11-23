@@ -7,11 +7,40 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static elte.peterpolena.graph.Config.*;
-import static elte.peterpolena.graph.Utils.*;
-import static java.awt.Color.*;
+import static elte.peterpolena.graph.Config.maxXCoordinate;
+import static elte.peterpolena.graph.Config.maxYCoordinate;
+import static elte.peterpolena.graph.Config.minXCoordinate;
+import static elte.peterpolena.graph.Config.minYCoordinate;
+import static elte.peterpolena.graph.Config.vertexRadius;
+import static elte.peterpolena.graph.Utils.addEdgesUpToMaxWeightToSubGraph;
+import static elte.peterpolena.graph.Utils.copy;
+import static elte.peterpolena.graph.Utils.getALeaf;
+import static elte.peterpolena.graph.Utils.getAdjacentVerticesAtDistance;
+import static elte.peterpolena.graph.Utils.getAdjacentVerticesUpToDistance;
+import static elte.peterpolena.graph.Utils.getCenters;
+import static elte.peterpolena.graph.Utils.getCentersCount;
+import static elte.peterpolena.graph.Utils.getComponentNodeCount;
+import static elte.peterpolena.graph.Utils.getFreeNodes;
+import static elte.peterpolena.graph.Utils.getRandomVertexFromDistance;
+import static elte.peterpolena.graph.Utils.getRequiredCenters;
+import static elte.peterpolena.graph.Utils.getRequiredCentersPerComponent;
+import static elte.peterpolena.graph.Utils.getSubGraph;
+import static elte.peterpolena.graph.Utils.getTreePathTo;
+import static elte.peterpolena.graph.Utils.hasUnmarkedNodesFurther;
+import static elte.peterpolena.graph.Utils.shuffleAndReduceToSize;
+import static java.awt.Color.BLACK;
+import static java.awt.Color.BLUE;
+import static java.awt.Color.CYAN;
+import static java.awt.Color.GREEN;
+import static java.awt.Color.ORANGE;
+import static java.awt.Color.RED;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
@@ -37,10 +66,11 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     private Result result = new Result();
 
     public Result mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
-                                 int maxCenters,
-                                 int maxClientsPerCenter,
-                                 int maxFailedCenters,
-                                 boolean isConservative) {
+								int maxCenters,
+								int maxClientsPerCenter,
+								int maxFailedCenters,
+								boolean isConservative,
+								boolean withFailure) {
 
         System.out.println("\nSTART MAIN ALGORITHM\n");
 
@@ -79,7 +109,16 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
             result.addGraphToDraw("[MAIN] Subgraph", subGraph);
             if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
                 result.addGraphToDraw("[MAIN] Result", graph);
-                System.out.println("\nEND MAIN ALGORITHM\n");
+				if (withFailure) {
+					Set<Vertex> failedCenters = new HashSet<>(shuffleAndReduceToSize(new ArrayList<>(getCenters(graph)), maxFailedCenters));
+					showFailedCenters(graph, failedCenters);
+					if (isConservative) {
+						//TODO
+					} else {
+						nonConservativeReAssignByFailedAlgorithm(subGraph, failedCenters, maxClientsPerCenter);
+					}
+				}
+				System.out.println("\nEND MAIN ALGORITHM\n");
                 return result;
             }
         }
@@ -424,7 +463,9 @@ free node => node.getColor().equals(BLACK)
     }
 
     private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
-        //TODO we need that subgraph when the original algorithm was successful
+		//TODO: result.addGraphToDraw(subgraph) when we want to show a step
+		//TODO: recolor vertices missing?
+
         Map<Pair<Vertex, Vertex>, Vertex> X = new HashMap<>();
 
         failedCenters.forEach(failed -> {
@@ -723,6 +764,18 @@ free node => node.getColor().equals(BLACK)
 
         }
     }
+
+	private void showFailedCenters(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> failedCenters) {
+		//show a graph with highlighted failed centers before calling reassignedByFailed algorithm
+		Graph<Vertex, DefaultWeightedEdge> graphCopy = copy(graph);
+		graphCopy
+				.vertexSet()
+				.stream()
+				.filter(failedCenters::contains)
+				.collect(toSet())
+				.forEach(failedCenter -> failedCenter.setColor(ORANGE));
+		result.addGraphToDraw("[MAIN] Failed centers", graphCopy);
+	}
 
     //Will not be implemented...
     /*private void chainRoutingProblem(Graph<Vertex, WeightedEdgeWithCapacity> subGraph, Map<WeightedEdgeWithCapacity, Integer> load) {

@@ -5,9 +5,19 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
-import javax.swing.*;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JSlider;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
+import javax.swing.Timer;
 import javax.swing.event.ChangeListener;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
@@ -36,6 +46,7 @@ public class Window {
     private boolean showEdgeWeight = true;
     private boolean isConservative = false;
 	private boolean autoDisplay = false;
+    private boolean withFailure = true;
     private int maxCentersValue;
     private int maxClientsPerCentersValue;
     private int maxFailedCentersValue;
@@ -43,15 +54,21 @@ public class Window {
 	private int graphIndex;
 	private int maxGraphIndex;
 	private JLabel descriptionLabel;
+    private JLabel nodesLabel;
 	private JSlider nodesSlider;
 	private JCheckBox randomizedPlacementCheckBox;
-	private JCheckBox showEdgeWeightCheckbox;
-	private JCheckBox isConservativeCheckbox;
-	private JCheckBox autoDisplayCheckbox;
+    private JCheckBox showEdgeWeightCheckBox;
+    private JCheckBox isConservativeCheckBox;
+    private JCheckBox autoDisplayCheckBox;
+    private JCheckBox withFailureCheckBox;
 	private JButton reloadButton;
+    private JLabel maxCentersLabel;
 	private JSpinner maxCentersSpinner;
+    private JLabel maxClientsPerCenterLabel;
 	private JSpinner maxClientsPerCenterSpinner;
+    private JLabel maxFailedCentersLabel;
 	private JSpinner maxFailedCentersSpinner;
+    private JLabel timerDelayLabel;
 	private JSpinner timerDelaySpinner;
 	private JButton executeMainAlgorithmButton;
 	private JButton showPreviousPartialResult;
@@ -76,7 +93,7 @@ public class Window {
 
 		maxCentersValue = 1;
 		maxClientsPerCentersValue = 1;
-		maxFailedCentersValue = 2;
+        maxFailedCentersValue = 1;
 
         GraphGenerator graphGenerator = new GraphGenerator();
 
@@ -97,7 +114,7 @@ public class Window {
         nodesSlider.setPaintLabels(true);
         nodesSlider.setSnapToTicks(true);
         nodesSlider.setName("NodesSlider");
-        JLabel NodesLabel = new JLabel("V");
+        nodesLabel = new JLabel("V");
 
 		randomizedPlacementCheckBox = new JCheckBox("Randomized placement", randomizedPlacement);
         randomizedPlacementCheckBox.addItemListener(e -> {
@@ -106,20 +123,28 @@ public class Window {
             drawGraph(generatedGraph);
         });
 
-		showEdgeWeightCheckbox = new JCheckBox("W", showEdgeWeight);
-        showEdgeWeightCheckbox.setToolTipText("Enable to show edge weight");
-        showEdgeWeightCheckbox.addItemListener(e -> {
+        showEdgeWeightCheckBox = new JCheckBox("Weights", showEdgeWeight);
+        showEdgeWeightCheckBox.setToolTipText("Enable to show edge weight");
+        showEdgeWeightCheckBox.addItemListener(e -> {
             showEdgeWeight = e.getStateChange() == SELECTED;
 			drawGraph(graph);
         });
 
-		isConservativeCheckbox = new JCheckBox("C", isConservative);
-        isConservativeCheckbox.setToolTipText("Enable to use conservative algorithm");
-        isConservativeCheckbox.addItemListener(e -> isConservative = e.getStateChange() == SELECTED);
+        isConservativeCheckBox = new JCheckBox("Conservative", isConservative);
+        isConservativeCheckBox.setToolTipText("Enable to use conservative algorithm");
+        isConservativeCheckBox.addItemListener(e -> isConservative = e.getStateChange() == SELECTED);
 
-		autoDisplayCheckbox = new JCheckBox("Auto", autoDisplay);
-		autoDisplayCheckbox.setToolTipText("Enable to automate algorithm result drawing");
-		autoDisplayCheckbox.addItemListener(e -> autoDisplay = e.getStateChange() == SELECTED);
+        autoDisplayCheckBox = new JCheckBox("Auto", autoDisplay);
+        autoDisplayCheckBox.setToolTipText("Enable to automate algorithm result drawing");
+        autoDisplayCheckBox.addItemListener(e -> {
+            autoDisplay = e.getStateChange() == SELECTED;
+            timerDelayLabel.setEnabled(autoDisplay);
+            timerDelaySpinner.setEnabled(autoDisplay);
+        });
+
+        withFailureCheckBox = new JCheckBox("Failure", withFailure);
+        withFailureCheckBox.setToolTipText("Enable to include the reassignment of α failed centers into the calculation");
+        withFailureCheckBox.addItemListener(e -> withFailure = e.getStateChange() == SELECTED);
 
 		reloadButton = new JButton("Reload");
         reloadButton.setToolTipText("Reload current graph with new edge weights");
@@ -133,25 +158,27 @@ public class Window {
         maxCentersSpinner.setToolTipText("Set the maximum number of assignable centers");
         ((JSpinner.DefaultEditor) maxCentersSpinner.getEditor()).getTextField().setEditable(false);
 		maxCentersSpinner.addChangeListener(e -> maxCentersValue = (int) maxCentersSpinner.getValue());
-        JLabel maxCentersLabel = new JLabel("K");
+        maxCentersLabel = new JLabel("K");
 
 		maxClientsPerCenterSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxClientsPerCenter, 1));
         maxClientsPerCenterSpinner.setToolTipText("Set the maximum number of clients assignable to a center");
         ((JSpinner.DefaultEditor) maxClientsPerCenterSpinner.getEditor()).getTextField().setEditable(false);
 		maxClientsPerCenterSpinner.addChangeListener(e -> maxClientsPerCentersValue = (int) maxClientsPerCenterSpinner.getValue());
-        JLabel maxClientsPerCenterLabel = new JLabel("L");
+        maxClientsPerCenterLabel = new JLabel("L");
 
 		maxFailedCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
         maxFailedCentersSpinner.setToolTipText("Set the maximum number of centers that could fail");
         ((JSpinner.DefaultEditor) maxFailedCentersSpinner.getEditor()).getTextField().setEditable(false);
 		maxFailedCentersSpinner.addChangeListener(e -> maxFailedCentersValue = (int) maxFailedCentersSpinner.getValue());
-        JLabel maxFailedCentersLabel = new JLabel("α");
+        maxFailedCentersLabel = new JLabel("α");
 
 		timerDelaySpinner = new JSpinner(new SpinnerNumberModel(500, 500, maxTimerDelay, 500));
 		timerDelaySpinner.setToolTipText("Set the delay in ms between displaying intermediate results");
 		((JSpinner.DefaultEditor) timerDelaySpinner.getEditor()).getTextField().setEditable(false);
 		timerDelaySpinner.addChangeListener(e -> timerDelay = (int) timerDelaySpinner.getValue());
-		JLabel timerDelayLabel = new JLabel("Delay");
+        timerDelaySpinner.setEnabled(autoDisplay);
+        timerDelayLabel = new JLabel("Delay(ms)");
+        timerDelayLabel.setEnabled(autoDisplay);
 
 		executeMainAlgorithmButton = new JButton("Start");
         executeMainAlgorithmButton.setToolTipText("Start the algorithm");
@@ -196,8 +223,8 @@ public class Window {
         optionsPanel.setSize(sliderPanelWidth, sliderPanelHeight);
 //        optionsPanel.add(centersLabel);
 //        optionsPanel.add(centerSlider);
-        optionsPanel.add(showEdgeWeightCheckbox);
-        optionsPanel.add(NodesLabel);
+        optionsPanel.add(showEdgeWeightCheckBox);
+        optionsPanel.add(nodesLabel);
         optionsPanel.add(nodesSlider);
 //        optionsPanel.add(randomizedPlacementCheckBox);
         optionsPanel.add(reloadButton);
@@ -209,8 +236,9 @@ public class Window {
         optionsPanel.add(maxFailedCentersSpinner);
 
 		JPanel drawControlsPanel = new JPanel();
-		drawControlsPanel.add(isConservativeCheckbox);
-		drawControlsPanel.add(autoDisplayCheckbox);
+        drawControlsPanel.add(isConservativeCheckBox);
+        drawControlsPanel.add(withFailureCheckBox);
+        drawControlsPanel.add(autoDisplayCheckBox);
 		drawControlsPanel.add(timerDelayLabel);
 		drawControlsPanel.add(timerDelaySpinner);
 		drawControlsPanel.add(executeMainAlgorithmButton);
@@ -241,22 +269,25 @@ public class Window {
 				maxCentersValue,
 				maxClientsPerCentersValue,
 				maxFailedCentersValue,
-				isConservative);
+                isConservative,
+                withFailure);
 
-		graphsToDraw = result.getGraphsToDraw();
-		descriptions = result.getDescriptions();
-		graphIndex = -1;
-		maxGraphIndex = graphsToDraw.size() - 1;
+        if (result != null) {
+            enableOptions(false, autoDisplay);
 
-		enableOptions(false, autoDisplay);
+            graphsToDraw = result.getGraphsToDraw();
+            descriptions = result.getDescriptions();
+            graphIndex = -1;
+            maxGraphIndex = graphsToDraw.size() - 1;
 
-		if (result != null && autoDisplay) {
-			autoDrawSubGraphs();
-		} else if (result != null) {
-			manuallyDrawSubGraph(true);
-		} else {
-			System.out.println("NOT SOLVABLE");
-		}
+            if (autoDisplay) {
+                autoDrawSubGraphs();
+            } else {
+                manuallyDrawSubGraph(true);
+            }
+        } else {
+            System.out.println("NOT SOLVABLE");
+        }
     }
 
 	private void manuallyDrawSubGraph(boolean next) {
@@ -294,14 +325,19 @@ public class Window {
 
 	private void enableOptions(boolean enable, boolean autoDisplay) {
 		nodesSlider.setEnabled(enable);
-		randomizedPlacementCheckBox.setEnabled(enable);
-		showEdgeWeightCheckbox.setEnabled(enable);
-		isConservativeCheckbox.setEnabled(enable);
-		autoDisplayCheckbox.setEnabled(enable);
+        //randomizedPlacementCheckBox.setEnabled(enable);
+        showEdgeWeightCheckBox.setEnabled(enable);
+        isConservativeCheckBox.setEnabled(enable);
+        autoDisplayCheckBox.setEnabled(enable);
+        withFailureCheckBox.setEnabled(enable);
 		reloadButton.setEnabled(enable);
+        maxCentersLabel.setEnabled(enable);
 		maxCentersSpinner.setEnabled(enable);
+        maxClientsPerCenterLabel.setEnabled(enable);
 		maxClientsPerCenterSpinner.setEnabled(enable);
+        maxFailedCentersLabel.setEnabled(enable);
 		maxFailedCentersSpinner.setEnabled(enable);
+        timerDelayLabel.setEnabled(enable);
 		timerDelaySpinner.setEnabled(enable);
 		executeMainAlgorithmButton.setEnabled(enable);
 		end.setEnabled(!enable);

@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Set;
 
 import static java.awt.Color.BLACK;
-import static java.awt.Color.BLUE;
 import static java.awt.Color.RED;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -224,8 +223,12 @@ public class Utils {
         return copy;
     }
 
+    public static Set<Vertex> getCenters(Graph<Vertex, DefaultWeightedEdge> graph) {
+        return graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).collect(toSet());
+    }
+
 	public static long getCentersCount(Graph<Vertex, DefaultWeightedEdge> graph) {
-		return graph.vertexSet().stream().filter(vertex -> vertex.getColor().equals(RED)).count();
+        return getCenters(graph).size();
 	}
 
     public static int levelOfNode(Vertex node) {
