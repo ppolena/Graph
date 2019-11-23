@@ -82,7 +82,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         for (Graph<Vertex, DefaultWeightedEdge> subGraph : subGraphs) {
             result.addGraphToDraw("[MAIN] Subgraph", subGraph);
             if (assignCentersAlgorithm(subGraph, maxCenters, maxClientsPerCenter, maxFailedCenters, isConservative)) {
-                result.addGraphToDraw("[MAIN] Result", graph);
+				result.addGraphToDraw("[MAIN] Result of main algorithm", graph);
 				if (withFailure) {
 					Set<Vertex> failedCenters = new HashSet<>(shuffleAndReduceToSize(new ArrayList<>(getCenters(graph)), maxFailedCenters));
 					showFailedCenters(graph, failedCenters);
@@ -91,6 +91,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 					} else {
 						nonConservativeReAssignByFailedAlgorithm(subGraph, failedCenters, maxClientsPerCenter);
 					}
+					result.addGraphToDraw("[MAIN] Final result after reassigning failed centers", graph);
 				}
 				System.out.println("\nEND MAIN ALGORITHM\n");
                 return result;
