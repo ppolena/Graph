@@ -5,19 +5,9 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JSlider;
-import javax.swing.JSpinner;
-import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingConstants;
-import javax.swing.Timer;
+import javax.swing.*;
 import javax.swing.event.ChangeListener;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
@@ -31,10 +21,11 @@ import static elte.peterpolena.graph.Config.sliderMaxValue;
 import static elte.peterpolena.graph.Config.sliderMinValue;
 import static elte.peterpolena.graph.Config.sliderPanelHeight;
 import static elte.peterpolena.graph.Config.sliderPanelWidth;
-import static elte.peterpolena.graph.Config.timerDelay;
 import static elte.peterpolena.graph.Utils.copy;
 import static elte.peterpolena.graph.Utils.getCentersCount;
 import static java.awt.event.ItemEvent.SELECTED;
+
+//import static elte.peterpolena.graph.Config.timerDelay;
 
 @Service
 public class Window {
@@ -45,26 +36,44 @@ public class Window {
     private boolean randomizedPlacement = false;
     private boolean showEdgeWeight = true;
     private boolean isConservative = false;
+	private boolean auto = false;
     private int maxCentersValue;
     private int maxClientsPerCentersValue;
     private int maxFailedCentersValue;
-    private JLabel descriptionLabel;
+	private int timerDelay;
+	private JLabel descriptionLabel;
+	private JSlider nodesSlider;
+	private JCheckBox randomizedPlacementCheckBox;
+	private JCheckBox showEdgeWeightCheckbox;
+	private JCheckBox isConservativeCheckbox;
+	private JCheckBox autoCheckbox;
+	private JButton reloadButton;
+	private JSpinner maxCentersSpinner;
+	private JSpinner maxClientsPerCenterSpinner;
+	private JSpinner maxFailedCentersSpinner;
+	private JSpinner timerDelaySpinner;
+	private JButton executeMainAlgorithmButton;
+	private JButton showPreviousPartialResult;
+	private JButton showNextPartialResult;
+	private JButton end;
+	private Timer drawSubGraphsTimer;
+	private Result result;
 
-    public Window(){
+	public Window() {
 
-        this.frame = new JFrame("Graph");
-        this.frame.setSize(frameWidth, frameHeight);
-        this.frame.setLocationRelativeTo(null);
-        this.frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame = new JFrame("Graph");
+		frame.setSize(frameWidth, frameHeight);
+		frame.setLocationRelativeTo(null);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        this.graph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-        this.graphPainter = new GraphPainter(graph, showEdgeWeight);
+		graph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+		graphPainter = new GraphPainter(graph, showEdgeWeight);
 
-        this.descriptionLabel = new JLabel("Vertices: " + this.graph.vertexSet().size() + ", Edges: " + this.graph.edgeSet().size());
+		descriptionLabel = new JLabel("Vertices: " + graph.vertexSet().size() + ", Edges: " + graph.edgeSet().size());
 
-        this.maxCentersValue = 1;
-        this.maxClientsPerCentersValue = 1;
-        this.maxFailedCentersValue = 2;
+		maxCentersValue = 1;
+		maxClientsPerCentersValue = 1;
+		maxFailedCentersValue = 2;
 
         GraphGenerator graphGenerator = new GraphGenerator();
 
@@ -77,7 +86,7 @@ public class Window {
 //        centerSlider.setName("CentersSlider");
 //        JLabel centersLabel = new JLabel("Centers");
 
-        JSlider nodesSlider = new JSlider(SwingConstants.HORIZONTAL, sliderMinValue, sliderMaxValue, clientsSliderStartValue);
+		nodesSlider = new JSlider(SwingConstants.HORIZONTAL, sliderMinValue, sliderMaxValue, clientsSliderStartValue);
         nodesSlider.setToolTipText("Set the number of vertices");
         nodesSlider.setMinorTickSpacing(1);
         nodesSlider.setMajorTickSpacing(1);
@@ -87,25 +96,29 @@ public class Window {
         nodesSlider.setName("NodesSlider");
         JLabel NodesLabel = new JLabel("V");
 
-        JCheckBox randomizedPlacementCheckBox = new JCheckBox("Randomized placement", randomizedPlacement);
+		randomizedPlacementCheckBox = new JCheckBox("Randomized placement", randomizedPlacement);
         randomizedPlacementCheckBox.addItemListener(e -> {
             randomizedPlacement = e.getStateChange() == SELECTED;
             Graph<Vertex, DefaultWeightedEdge> generatedGraph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
             drawGraph(generatedGraph);
         });
 
-        JCheckBox showEdgeWeightCheckbox = new JCheckBox("W", showEdgeWeight);
+		showEdgeWeightCheckbox = new JCheckBox("W", showEdgeWeight);
         showEdgeWeightCheckbox.setToolTipText("Enable to show edge weight");
         showEdgeWeightCheckbox.addItemListener(e -> {
             showEdgeWeight = e.getStateChange() == SELECTED;
-            drawGraph(this.graph);
+			drawGraph(graph);
         });
 
-        JCheckBox isConservativeCheckbox = new JCheckBox("C", isConservative);
+		isConservativeCheckbox = new JCheckBox("C", isConservative);
         isConservativeCheckbox.setToolTipText("Enable to use conservative algorithm");
         isConservativeCheckbox.addItemListener(e -> isConservative = e.getStateChange() == SELECTED);
 
-        JButton reloadButton = new JButton("Reload");
+		autoCheckbox = new JCheckBox("Auto", auto);
+		autoCheckbox.setToolTipText("Enable to automate algorithm result drawing");
+		autoCheckbox.addItemListener(e -> auto = e.getStateChange() == SELECTED);
+
+		reloadButton = new JButton("Reload");
         reloadButton.setToolTipText("Reload current graph with new edge weights");
         reloadButton.addActionListener(e -> {
 			Graph<Vertex, DefaultWeightedEdge> generatedGraph = graphGenerator.generate(0, nodesSlider.getValue(), randomizedPlacement);
@@ -113,27 +126,50 @@ public class Window {
 			descriptionLabel.setText("Vertices: " + generatedGraph.vertexSet().size() + ", Edges: " + generatedGraph.edgeSet().size());
         });
 
-        JSpinner maxCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
+		maxCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
         maxCentersSpinner.setToolTipText("Set the maximum number of assignable centers");
         ((JSpinner.DefaultEditor) maxCentersSpinner.getEditor()).getTextField().setEditable(false);
-        maxCentersSpinner.addChangeListener(e -> this.maxCentersValue = (int) maxCentersSpinner.getValue());
+		maxCentersSpinner.addChangeListener(e -> maxCentersValue = (int) maxCentersSpinner.getValue());
         JLabel maxCentersLabel = new JLabel("K");
 
-        JSpinner maxClientsPerCenterSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxClientsPerCenter, 1));
+		maxClientsPerCenterSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxClientsPerCenter, 1));
         maxClientsPerCenterSpinner.setToolTipText("Set the maximum number of clients assignable to a center");
         ((JSpinner.DefaultEditor) maxClientsPerCenterSpinner.getEditor()).getTextField().setEditable(false);
-        maxClientsPerCenterSpinner.addChangeListener(e -> this.maxClientsPerCentersValue = (int) maxClientsPerCenterSpinner.getValue());
+		maxClientsPerCenterSpinner.addChangeListener(e -> maxClientsPerCentersValue = (int) maxClientsPerCenterSpinner.getValue());
         JLabel maxClientsPerCenterLabel = new JLabel("L");
 
-        JSpinner maxFailedCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
+		maxFailedCentersSpinner = new JSpinner(new SpinnerNumberModel(1, 1, maxCenters, 1));
         maxFailedCentersSpinner.setToolTipText("Set the maximum number of centers that could fail");
         ((JSpinner.DefaultEditor) maxFailedCentersSpinner.getEditor()).getTextField().setEditable(false);
-        maxFailedCentersSpinner.addChangeListener(e -> this.maxFailedCentersValue = (int) maxFailedCentersSpinner.getValue());
+		maxFailedCentersSpinner.addChangeListener(e -> maxFailedCentersValue = (int) maxFailedCentersSpinner.getValue());
         JLabel maxFailedCentersLabel = new JLabel("α");
 
-        JButton executeMainAlgorithmButton = new JButton("Start");
+		timerDelaySpinner = new JSpinner(new SpinnerNumberModel(500, 500, 10000, 500));
+		timerDelaySpinner.setToolTipText("Set the delay in ms between displaying intermediate results");
+		((JSpinner.DefaultEditor) timerDelaySpinner.getEditor()).getTextField().setEditable(false);
+		timerDelaySpinner.addChangeListener(e -> timerDelay = (int) timerDelaySpinner.getValue());
+		JLabel timerDelayLabel = new JLabel("Delay");
+
+		executeMainAlgorithmButton = new JButton("Start");
         executeMainAlgorithmButton.setToolTipText("Start the algorithm");
         executeMainAlgorithmButton.addActionListener(e -> executeMainAlgorithm());
+
+		showPreviousPartialResult = new JButton("<");
+		showPreviousPartialResult.setToolTipText("Show previous partial result");
+		showPreviousPartialResult.setEnabled(false);
+
+		showNextPartialResult = new JButton(">");
+		showNextPartialResult.setToolTipText("Show next partial result");
+		showNextPartialResult.setEnabled(false);
+
+		end = new JButton("END");
+		end.setToolTipText("Finish showing partial results and jump to end result");
+		end.addActionListener(e -> {
+			if (auto) {
+				endAutoDisplay();
+			}
+		});
+		end.setEnabled(false);
 
         ChangeListener optionsChangeListener = e -> {
             JSlider slider = (JSlider) e.getSource();
@@ -163,40 +199,65 @@ public class Window {
         optionsPanel.add(maxFailedCentersLabel);
         optionsPanel.add(maxFailedCentersSpinner);
         optionsPanel.add(isConservativeCheckbox);
+		optionsPanel.add(autoCheckbox);
+		optionsPanel.add(timerDelayLabel);
+		optionsPanel.add(timerDelaySpinner);
         optionsPanel.add(executeMainAlgorithmButton);
+		optionsPanel.add(showPreviousPartialResult);
+		optionsPanel.add(showNextPartialResult);
+		optionsPanel.add(end);
 
         JPanel descriptionPanel = new JPanel();
         descriptionPanel.add(descriptionLabel);
 
-        this.frame.add(optionsPanel, BorderLayout.SOUTH);
-        this.frame.add(descriptionPanel, BorderLayout.NORTH);
+		frame.add(optionsPanel, BorderLayout.SOUTH);
+		frame.add(descriptionPanel, BorderLayout.NORTH);
 
-        this.frame.validate();
-        this.frame.repaint();
-        this.frame.setVisible(true);
+		frame.validate();
+		frame.repaint();
+		frame.setVisible(true);
     }
 
-    private void executeMainAlgorithm() {
+	private void executeMainAlgorithm() {
 
-        this.drawGraph(this.graph);
+		drawGraph(graph);
 
-        Result result = new AlgorithmService().mainAlgorithm(
-                this.graph,
-                this.maxCentersValue,
-                this.maxClientsPerCentersValue,
-                this.maxFailedCentersValue,
-                this.isConservative);
+		result = new AlgorithmService().mainAlgorithm(
+				graph,
+				maxCentersValue,
+				maxClientsPerCentersValue,
+				maxFailedCentersValue,
+				isConservative);
 
-        System.out.println("\nSTART DRAWING RESULT\n");
-        if (result != null) {
-            drawSubGraphs(result);
-        } else {
-            System.out.println("NOT SOLVABLE");
-        }
+		if (result != null && auto) {
+			setEnableOptions(false);
+			end.setEnabled(true);
+			drawSubGraphs(result);
+		} else if (result != null) {
+
+		} else {
+			System.out.println("NOT SOLVABLE");
+		}
     }
+
+	private void setEnableOptions(boolean enable) {
+		nodesSlider.setEnabled(enable);
+		randomizedPlacementCheckBox.setEnabled(enable);
+		showEdgeWeightCheckbox.setEnabled(enable);
+		isConservativeCheckbox.setEnabled(enable);
+		autoCheckbox.setEnabled(enable);
+		reloadButton.setEnabled(enable);
+		maxCentersSpinner.setEnabled(enable);
+		maxClientsPerCenterSpinner.setEnabled(enable);
+		maxFailedCentersSpinner.setEnabled(enable);
+		timerDelaySpinner.setEnabled(enable);
+		executeMainAlgorithmButton.setEnabled(enable);
+	}
 
     private void drawSubGraphs(Result result) {
 
+		System.out.println("\nSTART DRAWING RESULT\n");
+    	
         List<Graph<Vertex, DefaultWeightedEdge>> graphsToDraw = result.getGraphsToDraw();
         List<String> descriptions = result.getDescriptions();
 
@@ -211,6 +272,7 @@ public class Window {
                     System.out.println("\nEND DRAWING RESULT\n");
                     sourceTimer.stop();
 					resetToOriginal(result.getOriginalGraph());
+					setEnableOptions(true);
                 } else {
                     Graph<Vertex, DefaultWeightedEdge> graphToDraw = graphsToDraw.get(graphIndex);
                     int vertexCount = graphToDraw.vertexSet().size();
@@ -222,22 +284,34 @@ public class Window {
                 }
             }
         };
-        Timer drawSubGraphsTimer = new Timer(timerDelay, drawSubGraphsListener);
+		drawSubGraphsTimer = new Timer(timerDelay, drawSubGraphsListener);
         drawSubGraphsTimer.setInitialDelay(0);
         drawSubGraphsTimer.start();
     }
 
+	private void endAutoDisplay() {
+		drawSubGraphsTimer.stop();
+		setEnableOptions(true);
+		Graph<Vertex, DefaultWeightedEdge> endResult = result.getGraphsToDraw().get(result.getGraphsToDraw().size() - 1);
+		drawGraph(endResult);
+		graph = copy(result.getOriginalGraph());
+		System.out.println("\tJumping to end result...");
+		System.out.println("\tCenters drawn: " + getCentersCount(endResult));
+		System.out.println("\nEND DRAWING RESULT\n");
+		end.setEnabled(false);
+	}
+
     private void drawGraph(Graph<Vertex, DefaultWeightedEdge> graph) {
-        this.frame.remove(graphPainter);
-        this.frame.validate();
-        this.frame.repaint();
+		frame.remove(graphPainter);
+		frame.validate();
+		frame.repaint();
 
         this.graph = copy(graph);
-        this.graphPainter = new GraphPainter(this.graph, showEdgeWeight);
+		graphPainter = new GraphPainter(this.graph, showEdgeWeight);
 
-        this.frame.add(graphPainter, BorderLayout.CENTER);
-        this.frame.validate();
-        this.frame.repaint();
+		frame.add(graphPainter, BorderLayout.CENTER);
+		frame.validate();
+		frame.repaint();
     }
 
     private void resetToOriginal(Graph<Vertex, DefaultWeightedEdge> graph) {
