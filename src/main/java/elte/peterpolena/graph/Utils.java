@@ -5,16 +5,11 @@ import org.jgrapht.Graphs;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
+import java.awt.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-import static java.awt.Color.BLACK;
-import static java.awt.Color.RED;
+import static java.awt.Color.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.intersection;
@@ -220,6 +215,42 @@ public class Utils {
 		} else if (!graph.vertexSet().isEmpty()) {
 			graph.vertexSet().forEach(vertex -> copy.addVertex(new Vertex(vertex)));
 		}
+        return copy;
+    }
+
+    public static Graph<Vertex, DefaultWeightedEdge> copyHighlight(Graph<Vertex, DefaultWeightedEdge> graph, Set<Vertex> vertices, Vertex exceptionVertex, Color vertexColor) {
+        Graph<Vertex, DefaultWeightedEdge> copy = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        if (!graph.edgeSet().isEmpty()) {
+            graph.edgeSet().forEach(edge -> {
+                Vertex source = new Vertex(graph.getEdgeSource(edge));
+                source.setColor(BLACK);
+                Vertex target = new Vertex(graph.getEdgeTarget(edge));
+                target.setColor(BLACK);
+                if (!vertices.contains(source))
+                    source.setColor(GRAY);
+                if (!vertices.contains(target))
+                    target.setColor(GRAY);
+                if (source.equals(exceptionVertex))
+                    source.setColor(vertexColor);
+                if (target.equals(exceptionVertex))
+                    target.setColor(vertexColor);
+                copy.addVertex(source);
+                copy.addVertex(target);
+                copy.addEdge(source, target);
+                copy.setEdgeWeight(source, target, graph.getEdgeWeight(edge));
+            });
+        }
+        graph.vertexSet().forEach(x -> {
+            if (!copy.vertexSet().contains(x)) {
+                Vertex missingVertex = new Vertex(x);
+                missingVertex.setColor(BLACK);
+                if (!vertices.contains(missingVertex))
+                    missingVertex.setColor(GRAY);
+                if (missingVertex.equals(exceptionVertex))
+                    missingVertex.setColor(vertexColor);
+                copy.addVertex(missingVertex);
+            }
+        });
         return copy;
     }
 

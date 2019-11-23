@@ -176,6 +176,7 @@ vertex.getCenter() = ctr(v)
         empire.clear();
         parent = null;
         children.clear();
+        backupCenters.clear();
         setColor(Color.BLACK);
     }
 

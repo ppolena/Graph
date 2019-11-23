@@ -38,6 +38,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
     private Set<Vertex> allOfM1 = new HashSet<>();
     private Set<Vertex> allOfM2 = new HashSet<>();
     private Set<Vertex> allOfM = new HashSet<>();
+    private boolean allSucceeded;
 
     public Result mainAlgorithm(Graph<Vertex, DefaultWeightedEdge> graph,
 								int maxCenters,
@@ -151,10 +152,11 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
 
 		System.out.println("\tSubGraph connected components: " + connectedComponentSet.size());
 
+        allSucceeded = true;
         if (isConservative) {
             connectedComponentSet.forEach(cc -> {
                 result.addGraphToDraw("[ASSIGN CENTERS] Connected Component", cc);
-                callConservativeAlgorithms(cc, maxCenters, maxClientsPerCenter, maxFailedCenters);
+                allSucceeded = allSucceeded && callConservativeAlgorithms(cc, maxCenters, maxClientsPerCenter, maxFailedCenters);
             });
         } else {
             connectedComponentSet.forEach(cc -> {
@@ -171,12 +173,12 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("\tMax centers: " + maxCenters);
         System.out.printf("\tAllocated centers <= Max centers: " + centersBelowOrEqualToMaxCenters);
         System.out.println("\n\nEND ASSIGN CENTERS ALGORITHM\n");
-        return centersBelowOrEqualToMaxCenters;
+        return centersBelowOrEqualToMaxCenters && allSucceeded;
     }
 
-	private void callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> connectedComponent,
-											   int maxClientsPerCenter,
-											   int maxFailedCenters) {
+    private boolean callNonConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> connectedComponent,
+                                                  int maxClientsPerCenter,
+                                                  int maxFailedCenters) {
 
 		System.out.println("\n---ITERATION START---\n");
         m1.clear();
@@ -184,16 +186,17 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         m.clear();
 		nonConservativeSelectMonarchsAlgorithm(connectedComponent, maxFailedCenters);
 		nonConservativeAssignDomainsAlgorithm(connectedComponent, maxClientsPerCenter);
-		nonConservativeReAssignAlgorithm(connectedComponent, maxClientsPerCenter, maxFailedCenters);
+        boolean succeededToProduceEnoughCeners = nonConservativeReAssignAlgorithm(connectedComponent, maxClientsPerCenter, maxFailedCenters);
         //nonConservativeReAssignByFailedAlgorithm(subGraph);
 		System.out.println("\tNumber of centers in connected component at the end of iteration: " + getCentersCount(connectedComponent));
 		System.out.println("\n---ITERATION END---\n");
+        return succeededToProduceEnoughCeners;
     }
 
-    private void callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
-                                            int maxCenters,
-                                            int maxClientsPerCenter,
-                                            int maxFailedCenters) {
+    private boolean callConservativeAlgorithms(Graph<Vertex, DefaultWeightedEdge> subGraph,
+                                               int maxCenters,
+                                               int maxClientsPerCenter,
+                                               int maxFailedCenters) {
 
         m1.clear();
         m2.clear();
@@ -201,6 +204,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         conservativeSelectMonarchsAlgorithm(subGraph, maxFailedCenters);
         conservativeAssignDomainsAlgorithm(subGraph, maxClientsPerCenter);
         conservativeReAssignAlgorithm(subGraph, maxClientsPerCenter);
+        return true;
     }
 
     private void nonConservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
@@ -336,7 +340,7 @@ getAdjacentVerticesAtDistance(Gw, v, i) = Ni(v)
         System.out.println("\nEND ASSIGN DOMAINS ALGORITHM\n");
     }
 
-    private void nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter, int maxFailedCenters) {
+    private boolean nonConservativeReAssignAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxClientsPerCenter, int maxFailedCenters) {
 /*
 unassigned(m) => foreach m ∈ m1: foreach v ∈ m.getEmpire(): v.getCenter() == null
 free node => node.getColor().equals(BLACK)
@@ -441,11 +445,17 @@ free node => node.getColor().equals(BLACK)
         result.addGraphToDraw("[RE-ASSIGN DOMAINS] Connected Component", subGraph);
 
         System.out.println("\nEND REASSIGN ALGORITHM\n");
+        return centers >= requiredCenters;
     }
 
     private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
-		//TODO: result.addGraphToDraw(subgraph) when we want to show a step
-		//TODO: recolor vertices missing?
+
+        //draw failed clients
+        Set<Vertex> needNewHome = new HashSet<>();
+        failedCenters.forEach(failed -> {
+            needNewHome.addAll(failed.getClients());
+            result.addGraphToDraw("Failed center's clients", Utils.copyHighlight(subGraph, failed.getClients(), failed, YELLOW));
+        });
 
         Map<Pair<Vertex, Vertex>, Vertex> X = new HashMap<>();
 
@@ -455,11 +465,16 @@ free node => node.getColor().equals(BLACK)
                 team.add(monarch);
                 if(!team.contains(failed)) {
                     //select a different non-faulty center r from team(m)
-                    Vertex r = team.stream().filter(x -> !failedCenters.contains(x)).findAny().get();
+                    Vertex r = team.stream().filter(x -> !failedCenters.contains(x)).findAny().orElse(null);
                     X.put(new Pair<>(failed, monarch), r);
                 }
             });
         });
+
+        /*System.out.println("new home needed: " + needNewHome.size());
+        subGraph.vertexSet().stream().filter(x -> x.getColor() == RED).forEach(x -> {
+            System.out.println("center's fullness: " + x.getClients().size());
+        });*/
 
         //for each node v that was served by some f
         failedCenters.forEach(failed -> {
@@ -467,7 +482,6 @@ free node => node.getColor().equals(BLACK)
                 //unique free place
                 Vertex freeV = subGraph.vertexSet().stream().filter(x -> !failedCenters.contains(x)
                     && x.getColor() == RED && x.getClients().size() < maxClientsPerCenter).findAny().get();
-                //also add client to freev?
 
                 //MP = (m1, ... mj) path in T tree from failed to freeV's major
                 List<Vertex> MP = getTreePathTo(failed.getMajor(), freeV.getMajor());
@@ -490,9 +504,21 @@ free node => node.getColor().equals(BLACK)
                 }
 
             });
+            failed.getClients().clear();
         });
 
         failedCenters.forEach(x -> x.setColor(BLACK));
+
+        Set<Vertex> newHomes = new HashSet<>();
+        needNewHome.forEach(x -> newHomes.add(x.getCenter()));
+        newHomes.forEach(newHome -> {
+            Set<Vertex> reassignedClients = new HashSet<>();
+            needNewHome.forEach(x -> {
+                if (newHome.getClients().contains(x))
+                    reassignedClients.add(x);
+            });
+            result.addGraphToDraw("Failed center's clients", Utils.copyHighlight(subGraph, reassignedClients, newHome, RED));
+        });
     }
 
     private void conservativeSelectMonarchsAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, int maxFailedCenters) {
@@ -532,7 +558,9 @@ free node => node.getColor().equals(BLACK)
         m1.forEach(m -> {
             shuffleAndReduceToSize(getAdjacentVerticesAtDistance(subGraph, m, 1), maxFailedCenters).forEach(v -> {
                 m.getBackupCenters().add(v);
+                v.setMarked();
             });
+            System.out.println("\t\tMonarch with backup centers: " + m.getBackupCenters().size());
         });
 
         unmarkedNodes.clear();
@@ -584,24 +612,31 @@ free node => node.getColor().equals(BLACK)
         System.out.println("\nSTART ASSIGN DOMAINS ALGORITHM\n");
         System.out.println("\tConstructing bipartite graph...");
 
+
         Graph<Vertex, WeightedEdgeWithCapacity> bipartiteGraph = new SimpleDirectedWeightedGraph<>(WeightedEdgeWithCapacity.class);
-        subGraph.vertexSet().forEach(bipartiteGraph::addVertex);
+
+        Map<Vertex, Vertex> vertexCopies = new HashMap<>();
+        subGraph.vertexSet().forEach(x -> {
+            vertexCopies.put(x, new Vertex((x.getX() - minXCoordinate) / 2 + minXCoordinate + (maxXCoordinate - minXCoordinate) / 2, (x.getY() - (maxYCoordinate - minYCoordinate) / 2) / 2 + (maxYCoordinate - minYCoordinate) / 2, BLACK));
+        });
+        vertexCopies.values().forEach(bipartiteGraph::addVertex);
         //copy monarch set into bipartite graph
         Map<Vertex, Vertex> monarchCopies = new HashMap<>();
         m.forEach(x -> {
-            int diffPlacement = -50 - vertexRadius;
+            /*int diffPlacement = -50 - vertexRadius;
             if (x.getX() > (maxXCoordinate - minXCoordinate) / 2) {
                 diffPlacement += 100 + vertexRadius;
             }
-            monarchCopies.put(x, new Vertex(x.getX() + diffPlacement, x.getY(), GREEN));
+            monarchCopies.put(x, new Vertex(x.getX() + diffPlacement , x.getY(), GREEN));*/
+            monarchCopies.put(x, new Vertex((x.getX() - minXCoordinate) / 2 + minXCoordinate, (x.getY() - (maxYCoordinate - minYCoordinate) / 2) / 2 + (maxYCoordinate - minYCoordinate) / 2, GREEN));
         });
         monarchCopies.values().forEach(bipartiteGraph::addVertex);
         //E'
         monarchCopies.forEach((original, monarch) -> getAdjacentVerticesUpToDistance(subGraph, original, 2)
-                .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, adjacentVertex)));
+                .forEach(adjacentVertex -> bipartiteGraph.addEdge(monarch, vertexCopies.get(adjacentVertex))));
 
         //add s and t
-        Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, BLUE);
+        Vertex source = new Vertex(minXCoordinate + 10, minYCoordinate + 10, CYAN);
         Vertex target = new Vertex(maxXCoordinate - 10, maxYCoordinate - 10, BLUE);
         bipartiteGraph.addVertex(source);
         bipartiteGraph.addVertex(target);
@@ -613,23 +648,23 @@ free node => node.getColor().equals(BLACK)
         });
 
         //for v ∈ V add edge (v, t) and set (s, m) capacity to 1
-        subGraph.vertexSet().forEach(vertex -> {
+        vertexCopies.values().forEach(vertex -> {
             bipartiteGraph.addEdge(vertex, target);
             bipartiteGraph.getEdge(vertex, target).setCapacity(1);
         });
 
         //for m ∈ M and v ∈ V set (m, v) capacity to 1 and if m = v set (m,v) weight to 0
-        monarchCopies.forEach((original, monarch) -> subGraph.vertexSet()
-                .forEach(vertex -> {
+        monarchCopies.forEach((original, monarch) -> vertexCopies
+                .forEach((origV, vertex) -> {
                     if (bipartiteGraph.getEdge(monarch, vertex) != null) {
                         bipartiteGraph.getEdge(monarch, vertex).setCapacity(1);
-                        if (original.equals(vertex)) {
+                        if (original.equals(origV)) {
                             bipartiteGraph.setEdgeWeight(monarch, vertex, 0);
                         }
                     }
                 }));
 
-		result.addBipartiteGraphToDraw("[ASSIGN DOMAINS] Bipartite Graph", bipartiteGraph);
+        result.addBipartiteGraphToDraw("[ASSIGN DOMAINS] Bipartite Graph", bipartiteGraph);
 
         System.out.println("\tCalculating Minimum Cost Maximum Flow...");
         //Calculating minCostMaxFlow
@@ -757,14 +792,43 @@ free node => node.getColor().equals(BLACK)
     }
 
     private void conservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
+
+        //draw failed clients
+        Set<Vertex> needNewHome = new HashSet<>();
+        failedCenters.forEach(failed -> {
+            needNewHome.addAll(failed.getClients());
+            result.addGraphToDraw("Failed center's clients", Utils.copyHighlight(subGraph, failed.getClients(), failed, YELLOW));
+        });
+
         failedCenters.forEach(f -> {
-            Vertex newCenter = f.getBackupCenters().stream().findAny().get();
+            Vertex inspectedMonarch = f;
+            while (inspectedMonarch != null && inspectedMonarch.getBackupCenters().stream().filter(x -> !failedCenters.contains(x)).collect(toSet()).isEmpty()) {
+                inspectedMonarch = inspectedMonarch.getParent();
+            }
+            if (inspectedMonarch == null) {
+                inspectedMonarch = subGraph.vertexSet().stream().filter(x -> !x.getBackupCenters()
+                        .stream().filter(y -> !failedCenters.contains(y)).collect(toSet()).isEmpty()).findAny().get();
+            }
+            Vertex newCenter = inspectedMonarch.getBackupCenters().stream().filter(x -> !failedCenters.contains(x)).findAny().get();
             newCenter.getClients().addAll(f.getClients());
             newCenter.getClients().forEach(x -> x.setCenter(newCenter));
             f.getClients().clear();
 
             newCenter.setColor(RED);
             f.setColor(BLACK);
+            f.getBackupCenters().remove(newCenter);
+        });
+
+
+        Set<Vertex> newHomes = new HashSet<>();
+        needNewHome.forEach(x -> newHomes.add(x.getCenter()));
+        newHomes.forEach(newHome -> {
+            Set<Vertex> reassignedClients = new HashSet<>();
+            needNewHome.forEach(x -> {
+                if (newHome.getClients().contains(x))
+                    reassignedClients.add(x);
+            });
+            result.addGraphToDraw("Failed center's clients", Utils.copyHighlight(subGraph, reassignedClients, newHome, RED));
         });
     }
 
