@@ -17,6 +17,7 @@ import static elte.peterpolena.graph.Config.frameHeight;
 import static elte.peterpolena.graph.Config.frameWidth;
 import static elte.peterpolena.graph.Config.maxCenters;
 import static elte.peterpolena.graph.Config.maxClientsPerCenter;
+import static elte.peterpolena.graph.Config.maxTimerDelay;
 import static elte.peterpolena.graph.Config.sliderMaxValue;
 import static elte.peterpolena.graph.Config.sliderMinValue;
 import static elte.peterpolena.graph.Config.sliderPanelHeight;
@@ -24,8 +25,6 @@ import static elte.peterpolena.graph.Config.sliderPanelWidth;
 import static elte.peterpolena.graph.Utils.copy;
 import static elte.peterpolena.graph.Utils.getCentersCount;
 import static java.awt.event.ItemEvent.SELECTED;
-
-//import static elte.peterpolena.graph.Config.timerDelay;
 
 @Service
 public class Window {
@@ -36,17 +35,19 @@ public class Window {
     private boolean randomizedPlacement = false;
     private boolean showEdgeWeight = true;
     private boolean isConservative = false;
-	private boolean auto = false;
+	private boolean autoDisplay = false;
     private int maxCentersValue;
     private int maxClientsPerCentersValue;
     private int maxFailedCentersValue;
 	private int timerDelay;
+	private int graphIndex;
+	private int maxGraphIndex;
 	private JLabel descriptionLabel;
 	private JSlider nodesSlider;
 	private JCheckBox randomizedPlacementCheckBox;
 	private JCheckBox showEdgeWeightCheckbox;
 	private JCheckBox isConservativeCheckbox;
-	private JCheckBox autoCheckbox;
+	private JCheckBox autoDisplayCheckbox;
 	private JButton reloadButton;
 	private JSpinner maxCentersSpinner;
 	private JSpinner maxClientsPerCenterSpinner;
@@ -58,6 +59,8 @@ public class Window {
 	private JButton end;
 	private Timer drawSubGraphsTimer;
 	private Result result;
+	private List<Graph<Vertex, DefaultWeightedEdge>> graphsToDraw;
+	private List<String> descriptions;
 
 	public Window() {
 
@@ -114,9 +117,9 @@ public class Window {
         isConservativeCheckbox.setToolTipText("Enable to use conservative algorithm");
         isConservativeCheckbox.addItemListener(e -> isConservative = e.getStateChange() == SELECTED);
 
-		autoCheckbox = new JCheckBox("Auto", auto);
-		autoCheckbox.setToolTipText("Enable to automate algorithm result drawing");
-		autoCheckbox.addItemListener(e -> auto = e.getStateChange() == SELECTED);
+		autoDisplayCheckbox = new JCheckBox("Auto", autoDisplay);
+		autoDisplayCheckbox.setToolTipText("Enable to automate algorithm result drawing");
+		autoDisplayCheckbox.addItemListener(e -> autoDisplay = e.getStateChange() == SELECTED);
 
 		reloadButton = new JButton("Reload");
         reloadButton.setToolTipText("Reload current graph with new edge weights");
@@ -144,7 +147,7 @@ public class Window {
 		maxFailedCentersSpinner.addChangeListener(e -> maxFailedCentersValue = (int) maxFailedCentersSpinner.getValue());
         JLabel maxFailedCentersLabel = new JLabel("α");
 
-		timerDelaySpinner = new JSpinner(new SpinnerNumberModel(500, 500, 10000, 500));
+		timerDelaySpinner = new JSpinner(new SpinnerNumberModel(500, 500, maxTimerDelay, 500));
 		timerDelaySpinner.setToolTipText("Set the delay in ms between displaying intermediate results");
 		((JSpinner.DefaultEditor) timerDelaySpinner.getEditor()).getTextField().setEditable(false);
 		timerDelaySpinner.addChangeListener(e -> timerDelay = (int) timerDelaySpinner.getValue());
@@ -156,17 +159,21 @@ public class Window {
 
 		showPreviousPartialResult = new JButton("<");
 		showPreviousPartialResult.setToolTipText("Show previous partial result");
+		showPreviousPartialResult.addActionListener(e -> manuallyDrawSubGraph(false));
 		showPreviousPartialResult.setEnabled(false);
 
 		showNextPartialResult = new JButton(">");
 		showNextPartialResult.setToolTipText("Show next partial result");
+		showNextPartialResult.addActionListener(e -> manuallyDrawSubGraph(true));
 		showNextPartialResult.setEnabled(false);
 
 		end = new JButton("END");
 		end.setToolTipText("Finish showing partial results and jump to end result");
 		end.addActionListener(e -> {
-			if (auto) {
-				endAutoDisplay();
+			if (autoDisplay) {
+				endAutoDraw();
+			} else {
+				endManualDraw();
 			}
 		});
 		end.setEnabled(false);
@@ -182,8 +189,10 @@ public class Window {
 //        centerSlider.addChangeListener(optionsChangeListener);
         nodesSlider.addChangeListener(optionsChangeListener);
 
+		JPanel controlPanel = new JPanel();
+		controlPanel.setLayout(new GridLayout(2, 1));
+
         JPanel optionsPanel = new JPanel();
-        optionsPanel.setLayout(new FlowLayout());
         optionsPanel.setSize(sliderPanelWidth, sliderPanelHeight);
 //        optionsPanel.add(centersLabel);
 //        optionsPanel.add(centerSlider);
@@ -198,19 +207,24 @@ public class Window {
         optionsPanel.add(maxClientsPerCenterSpinner);
         optionsPanel.add(maxFailedCentersLabel);
         optionsPanel.add(maxFailedCentersSpinner);
-        optionsPanel.add(isConservativeCheckbox);
-		optionsPanel.add(autoCheckbox);
-		optionsPanel.add(timerDelayLabel);
-		optionsPanel.add(timerDelaySpinner);
-        optionsPanel.add(executeMainAlgorithmButton);
-		optionsPanel.add(showPreviousPartialResult);
-		optionsPanel.add(showNextPartialResult);
-		optionsPanel.add(end);
+
+		JPanel drawControlsPanel = new JPanel();
+		drawControlsPanel.add(isConservativeCheckbox);
+		drawControlsPanel.add(autoDisplayCheckbox);
+		drawControlsPanel.add(timerDelayLabel);
+		drawControlsPanel.add(timerDelaySpinner);
+		drawControlsPanel.add(executeMainAlgorithmButton);
+		drawControlsPanel.add(showPreviousPartialResult);
+		drawControlsPanel.add(showNextPartialResult);
+		drawControlsPanel.add(end);
+
+		controlPanel.add(optionsPanel);
+		controlPanel.add(drawControlsPanel);
 
         JPanel descriptionPanel = new JPanel();
         descriptionPanel.add(descriptionLabel);
 
-		frame.add(optionsPanel, BorderLayout.SOUTH);
+		frame.add(controlPanel, BorderLayout.SOUTH);
 		frame.add(descriptionPanel, BorderLayout.NORTH);
 
 		frame.validate();
@@ -229,37 +243,75 @@ public class Window {
 				maxFailedCentersValue,
 				isConservative);
 
-		if (result != null && auto) {
-			setEnableOptions(false);
-			end.setEnabled(true);
-			drawSubGraphs(result);
-		} else if (result != null) {
+		graphsToDraw = result.getGraphsToDraw();
+		descriptions = result.getDescriptions();
+		graphIndex = -1;
+		maxGraphIndex = graphsToDraw.size() - 1;
 
+		enableOptions(false, autoDisplay);
+
+		if (result != null && autoDisplay) {
+			autoDrawSubGraphs();
+		} else if (result != null) {
+			manuallyDrawSubGraph(true);
 		} else {
 			System.out.println("NOT SOLVABLE");
 		}
     }
 
-	private void setEnableOptions(boolean enable) {
+	private void manuallyDrawSubGraph(boolean next) {
+		if (next && graphIndex + 1 <= maxGraphIndex) {
+			++graphIndex;
+			showPreviousPartialResult.setEnabled(true);
+		} else //noinspection ConstantConditions
+			if (!next && graphIndex - 1 >= 0) {
+				--graphIndex;
+				showNextPartialResult.setEnabled(true);
+			}
+
+		drawPartialResult(graphIndex);
+
+		if (graphIndex + 1 > maxGraphIndex) {
+			showNextPartialResult.setEnabled(false);
+		} else if (graphIndex - 1 < 0) {
+			showPreviousPartialResult.setEnabled(false);
+		}
+	}
+
+	private void drawPartialResult(int graphIndex) {
+		Graph<Vertex, DefaultWeightedEdge> graphToDraw = graphsToDraw.get(graphIndex);
+		int vertexCount = graphToDraw.vertexSet().size();
+		int edgeCount = graphToDraw.edgeSet().size();
+		descriptionLabel.setText(descriptions.get(graphIndex));
+		System.out.println("\t(" + (graphsToDraw.size()) + "/" + (graphIndex + 1) + ") Drawing " + descriptions.get(graphIndex) + " with " + vertexCount + " vertices and " + edgeCount + " edges...");
+		drawGraph(graphsToDraw.get(graphIndex));
+	}
+
+	private void endManualDraw() {
+		graphIndex = -1;
+		end();
+	}
+
+	private void enableOptions(boolean enable, boolean autoDisplay) {
 		nodesSlider.setEnabled(enable);
 		randomizedPlacementCheckBox.setEnabled(enable);
 		showEdgeWeightCheckbox.setEnabled(enable);
 		isConservativeCheckbox.setEnabled(enable);
-		autoCheckbox.setEnabled(enable);
+		autoDisplayCheckbox.setEnabled(enable);
 		reloadButton.setEnabled(enable);
 		maxCentersSpinner.setEnabled(enable);
 		maxClientsPerCenterSpinner.setEnabled(enable);
 		maxFailedCentersSpinner.setEnabled(enable);
 		timerDelaySpinner.setEnabled(enable);
 		executeMainAlgorithmButton.setEnabled(enable);
+		end.setEnabled(!enable);
+		showPreviousPartialResult.setEnabled(!enable && !autoDisplay);
+		showNextPartialResult.setEnabled(!enable && !autoDisplay);
 	}
 
-    private void drawSubGraphs(Result result) {
+	private void autoDrawSubGraphs() {
 
 		System.out.println("\nSTART DRAWING RESULT\n");
-    	
-        List<Graph<Vertex, DefaultWeightedEdge>> graphsToDraw = result.getGraphsToDraw();
-        List<String> descriptions = result.getDescriptions();
 
         ActionListener drawSubGraphsListener = new ActionListener() {
 			int graphIndex = 0;
@@ -272,14 +324,9 @@ public class Window {
                     System.out.println("\nEND DRAWING RESULT\n");
                     sourceTimer.stop();
 					resetToOriginal(result.getOriginalGraph());
-					setEnableOptions(true);
+					enableOptions(true, autoDisplay);
                 } else {
-                    Graph<Vertex, DefaultWeightedEdge> graphToDraw = graphsToDraw.get(graphIndex);
-                    int vertexCount = graphToDraw.vertexSet().size();
-                    int edgeCount = graphToDraw.edgeSet().size();
-                    descriptionLabel.setText(descriptions.get(graphIndex));
-                    System.out.println("\t(" + (graphsToDraw.size()) + "/" + (graphIndex + 1) + ") Drawing " + descriptions.get(graphIndex) + " with " + vertexCount + " vertices and " + edgeCount + " edges...");
-                    drawGraph(graphToDraw);
+					drawPartialResult(graphIndex);
 					++graphIndex;
                 }
             }
@@ -289,13 +336,17 @@ public class Window {
         drawSubGraphsTimer.start();
     }
 
-	private void endAutoDisplay() {
+	private void endAutoDraw() {
 		drawSubGraphsTimer.stop();
-		setEnableOptions(true);
+		end();
+	}
+
+	private void end() {
+		descriptionLabel.setText(descriptions.get(descriptions.size() - 1));
+		enableOptions(true, autoDisplay);
 		Graph<Vertex, DefaultWeightedEdge> endResult = result.getGraphsToDraw().get(result.getGraphsToDraw().size() - 1);
 		drawGraph(endResult);
 		graph = copy(result.getOriginalGraph());
-		System.out.println("\tJumping to end result...");
 		System.out.println("\tCenters drawn: " + getCentersCount(endResult));
 		System.out.println("\nEND DRAWING RESULT\n");
 		end.setEnabled(false);
