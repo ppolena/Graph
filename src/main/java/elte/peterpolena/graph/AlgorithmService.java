@@ -428,7 +428,7 @@ free node => node.getColor().equals(BLACK)
 		long centers = getCentersCount(subGraph);
 
         //ceil(n/L) + α
-        long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / maxClientsPerCenter) + maxFailedCenters);
+        long requiredCenters = (long) (Math.ceil(subGraph.vertexSet().size() / (float) maxClientsPerCenter) + maxFailedCenters);
 
         System.out.println("\tCenters before end: " + centers);
         System.out.println("\tRequired: " + requiredCenters);
@@ -445,7 +445,7 @@ free node => node.getColor().equals(BLACK)
         result.addGraphToDraw("[RE-ASSIGN DOMAINS] Connected Component", subGraph);
 
         System.out.println("\nEND REASSIGN ALGORITHM\n");
-        return centers >= requiredCenters;
+        return getCentersCount(subGraph) >= requiredCenters;
     }
 
     private void nonConservativeReAssignByFailedAlgorithm(Graph<Vertex, DefaultWeightedEdge> subGraph, Set<Vertex> failedCenters, int maxClientsPerCenter) {
