@@ -25,6 +25,7 @@ import static elte.peterpolena.graph.Config.sliderPanelWidth;
 import static elte.peterpolena.graph.Utils.copy;
 import static elte.peterpolena.graph.Utils.getCentersCount;
 import static java.awt.event.ItemEvent.SELECTED;
+import static javax.swing.JOptionPane.WARNING_MESSAGE;
 import static javax.swing.JOptionPane.showMessageDialog;
 
 @Service
@@ -277,7 +278,7 @@ public class Window {
                 manuallyDrawSubGraph(true);
             }
         } else {
-			showMessageDialog(frame, "Problem not solvable with current parameters:\nK: " + maxCentersValue + "\nL: " + maxClientsPerCentersValue + "\nα: " + maxFailedCentersValue);
+			showMessageDialog(frame, "Problem not solvable with current parameters:\nK: " + maxCentersValue + "\nL: " + maxClientsPerCentersValue + "\nα: " + maxFailedCentersValue, "Problem not solvable", WARNING_MESSAGE);
             System.out.println("NOT SOLVABLE");
         }
     }
