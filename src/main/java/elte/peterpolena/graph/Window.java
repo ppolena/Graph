@@ -5,19 +5,9 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 import org.springframework.stereotype.Service;
 
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JSlider;
-import javax.swing.JSpinner;
-import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingConstants;
-import javax.swing.Timer;
+import javax.swing.*;
 import javax.swing.event.ChangeListener;
-import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
@@ -35,6 +25,7 @@ import static elte.peterpolena.graph.Config.sliderPanelWidth;
 import static elte.peterpolena.graph.Utils.copy;
 import static elte.peterpolena.graph.Utils.getCentersCount;
 import static java.awt.event.ItemEvent.SELECTED;
+import static javax.swing.JOptionPane.showMessageDialog;
 
 @Service
 public class Window {
@@ -286,6 +277,7 @@ public class Window {
                 manuallyDrawSubGraph(true);
             }
         } else {
+			showMessageDialog(frame, "Problem not solvable with current parameters:\nK: " + maxCentersValue + "\nL: " + maxClientsPerCentersValue + "\nα: " + maxFailedCentersValue);
             System.out.println("NOT SOLVABLE");
         }
     }
